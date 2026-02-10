@@ -45,7 +45,7 @@ def leer_pdf(archivo):
         except: pass
     return d
 
-# --- 4. MOTOR DE REDACCIÓN (SINTAXIS CORREGIDA) ---
+# --- 4. MOTOR DE REDACCIÓN ---
 def generar_word(tipo, gral, ejecucion, fondo):
     doc = Document()
     style = doc.styles['Normal']
@@ -60,6 +60,7 @@ def generar_word(tipo, gral, ejecucion, fondo):
 
     doc.add_paragraph(f"\nJUZGADO DE GARANTÍA DE {gral['juz'].upper()}").bold = True
 
+    # Recopilar RITs de ejecución para el encabezado
     rits_ej = ", ".join([f"{c['rit']} (RUC: {c['ruc']})" for c in ejecucion if c['rit']])
     intro = doc.add_paragraph()
     intro.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
@@ -90,14 +91,16 @@ def generar_word(tipo, gral, ejecucion, fondo):
         doc.add_paragraph("Solicito se oficie a Extranjería y se incorpore Extracto de Filiación actualizado.")
         doc.add_paragraph("\nPOR TANTO, PIDO A US. acceder.").bold = True
 
-    buf = io.BytesIO(); doc.save(buf); buf.seek(0)
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
     return buf
 
 # --- 5. INTERFAZ ---
 if check_auth():
     st.set_page_config(page_title="Generador IBL", layout="wide")
     
-    if 'ne_e' not in st.session_state: st.session_state.ne_e = 1
-    if 'nf_e' not in st.session_state: st.session_state.nf_e = 1
-    if 'ne_p' not in st.session_state: st.session_state.ne_p = 1
-    if 'nf_p' not in st
+    # Inicialización segura de contadores
+    if 'ne_e' not in st.session_state: st.session_state['ne_e'] = 1
+    if 'nf_e' not in st.session_state: st.session_state['nf_e'] = 1
+    if 'ne_p' not in st.
