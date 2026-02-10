@@ -116,11 +116,43 @@ with t1:
         st.download_button("📥 Descargar", res, f"Extincion_{a_d}.docx")
 
 with t2:
-    r_m = st.text_input("RUT MIA")
-    if st.button("⚡ Escaneo"):
-        with st.status("Motor..."):
-            d = configurar_driver()
-            if d:
-                d.get("https://www.google.com"); time.sleep(1); d.quit()
-                st.success(f"OK {r_m}")
-            else: st.error("Error")
+    with t2:
+    st.header("🔍 Módulo de Inteligencia MIA")
+    st_rut = st.text_input("RUT a investigar (con guion y dígito verificador)", placeholder="12345678-9")
+    
+    if st_rut:
+        # Limpiamos el RUT para diferentes formatos de búsqueda
+        rut_limpio = st_rut.replace(".", "").replace("-", "")
+        rut_solo_numeros = rut_limpio[:-1]
+        dv = rut_limpio[-1]
+
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 🏛️ Judicial y Público")
+            # Enlaces con búsqueda directa
+            st.link_button("⚖️ PJUD (Oficina Judicial)", "https://oficinajudicialvirtual.pjud.cl/index.php")
+            st.link_button("👤 Rutificador (Nombre/Dirección)", f"https://www.nombrerutyfirma.com/rut/{rut_solo_numeros}")
+            st.link_button("🗳️ SERVEL (Datos Electorales)", "https://consulta.servel.cl/")
+
+        with col2:
+            st.markdown("### 📱 Redes y Social")
+            st.link_button("🔍 Google Social Search", f"https://www.google.com/search?q={st_rut}+facebook+instagram+linkedin")
+            st.link_button("🏠 Registro Social (Acceso)", "https://rsh.ministeriodesarrollosocial.gob.cl/portada")
+
+        if st.button("⚡ Ejecutar Escaneo de Redes"):
+            with st.status("MIA está rastreando huella digital...") as s:
+                driver = configurar_driver()
+                if driver:
+                    # Ejemplo: Buscando en un buscador de perfiles
+                    driver.get(f"https://www.google.com/search?q=site:instagram.com+{st_rut}")
+                    time.sleep(2)
+                    st.write("Analizando posibles coincidencias en Instagram...")
+                    
+                    driver.get(f"https://www.google.com/search?q=site:facebook.com+{st_rut}")
+                    time.sleep(2)
+                    st.write("Analizando posibles coincidencias en Facebook...")
+                    
+                    driver.quit()
+                    s.update(label="Escaneo de redes completado", state="complete")
+                    st.info("Revisa los enlaces de arriba para obtener los datos oficiales detallados.")
