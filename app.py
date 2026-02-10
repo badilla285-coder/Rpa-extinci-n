@@ -14,7 +14,8 @@ def crear_escrito(datos, texto_condena):
     p = doc.add_paragraph()
     p.add_run("SUMILLA: SOLICITA DECLARACIÓN DE EXTINCIÓN DE RESPONSABILIDAD PENAL.\n").bold = True
     for c in datos['causas']:
-        p.add_run(f"RIT: {c['rit']} / RUC: {c['ruc']} - TRIBUNAL: {c['juzgado_causa']}\n")
+        # Se incluye el juzgado específico de cada causa en la sumilla
+        p.add_run(f"RIT: {c['rit']} / RUC: {c['ruc']} - JUZGADO: {c['juzgado_causa']}\n")
     p.add_run(f"TRIBUNAL DE EJECUCIÓN: {datos['juzgado_presentacion']}\n")
 
     doc.add_paragraph("\nEN LO PRINCIPAL: SOLICITA DECLARACIÓN DE EXTINCIÓN; OTROSÍ: ACOMPAÑA DOCUMENTO.")
@@ -25,12 +26,14 @@ def crear_escrito(datos, texto_condena):
     cuerpo = doc.add_paragraph()
     cuerpo.add_run(f"\n{datos['nombre_defensor']}, defensor penal público, por el adolescente {datos['nombre_adolescente']}, en las causas ya individualizadas, a SS. con respeto digo:\n")
     
-    # Detalle de causas en el cuerpo
-    texto_causas = "\n".join([f"RIT {c['rit']} del Juzgado de {c['juzgado_causa']}" for c in datos['causas']])
+    # Construcción del listado de causas para el cuerpo del escrito
+    texto_causas = ""
+    for c in datos['causas']:
+        texto_causas += f"- RIT {c['rit']}, RUC {c['ruc']} del Juzgado de Garantía de {c['juzgado_causa']}.\n"
     
-    cuerpo.add_run(f"\nQue, de conformidad a la Ley 20.084, solicito se declare la extinción de la responsabilidad penal en las causas: \n{texto_causas}, \npor haber sido mi representado condenado por un tribunal de adultos a una pena privativa de libertad, lo que resulta incompatible con la ejecución de las sanciones RPA.\n")
+    cuerpo.add_run(f"\nQue, de conformidad a la Ley 20.084, solicito se declare la extinción de la responsabilidad penal en las siguientes causas: \n{texto_causas}\nLo anterior, por haber sido mi representado condenado por un tribunal de adultos a una pena privativa de libertad, lo que resulta incompatible con la ejecución de las sanciones RPA.\n")
 
-    # TEXTO DEL PDF
+    # TRANSCRIPCIÓN DEL PDF
     doc.add_paragraph(texto_condena)
     
     p_final = doc.add_paragraph()
@@ -45,15 +48,18 @@ def crear_escrito(datos, texto_condena):
 st.set_page_config(page_title="Generador RPA")
 st.title("⚖️ Generador de Extinciones")
 
-nombre_defensor = st.text_input("Nombre Defensor")
+# Datos fijos arriba
+nombre_defensor = st.text_input("Nombre Defensor", value="Ignacio Badilla Lara")
 nombre_adolescente = st.text_input("Nombre Adolescente")
-juzgado_presentacion = st.text_input("Juzgado donde se presenta (Ej: San Bernardo)")
+juzgado_presentacion = st.text_input("Juzgado de Ejecución (Donde se envía)")
 
+st.markdown("---")
 st.subheader("Causas RPA")
+
 if 'n_causas' not in st.session_state:
     st.session_state.n_causas = 1
 
-col_btn1, col_btn2 = st.columns([0.1, 0.9])
+col_btn1, col_btn2 = st.columns([0.2, 0.8])
 with col_btn1:
     if st.button("➕"):
         st.session_state.n_causas += 1
@@ -62,23 +68,27 @@ with col_btn2:
         st.session_state.n_causas -= 1
 
 causas_lista = []
-for i in range(st.session_state.n_causas):
-    st.markdown(f"**Causa {i+1}**")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        ruc_v = st.text_input(f"RUC", key=f"ruc_{i}")
-    with c2:
-        rit_v = st.text_input(f"RIT", key=f"rit_{i}")
-    with c3:
-        juz_v = st.text_input(f"Juzgado de la causa", key=f"juz_{i}")
-    causas_lista.append({"ruc": ruc_v, "rit": rit_v, "juzgado_causa": juz_v})
 
-# BOTÓN PARA ADJUNTAR EL PDF
+# Bucle para generar los campos de cada causa
+for i in range(st.session_state.n_causas):
+    st.write(f"### Causa {i+1}")
+    ruc_v = st.text_input(f"RUC de la causa {i+1}", key=f"ruc_{i}")
+    rit_v = st.text_input(f"RIT de la causa {i+1}", key=f"rit_{i}")
+    juz_v = st.text_input(f"Juzgado donde fue sancionado (Causa {i+1})", key=f"juz_{i}")
+    
+    causas_lista.append({
+        "ruc": ruc_v, 
+        "rit": rit_v, 
+        "juzgado_causa": juz_v
+    })
+    st.markdown("---") # Línea divisoria para separar visualmente cada bloque de causa
+
+# Carga de archivo
 pdf_file = st.file_uploader("Adjuntar PDF Condena Adulto", type="pdf")
 
 if st.button("Generar Escrito"):
     if not pdf_file or not nombre_defensor:
-        st.error("Debe adjuntar el PDF y completar los nombres.")
+        st.error("Faltan datos obligatorios o el PDF.")
     else:
         try:
             reader = PyPDF2.PdfReader(pdf_file)
@@ -94,10 +104,13 @@ if st.button("Generar Escrito"):
             }
             
             doc_word = crear_escrito(info, txt_pdf)
-            st.success("Escrito generado.")
-            st.download_button("📥 Descargar Word", doc_word, f"Extincion_{nombre_adolescente}.docx")
+            st.success("Escrito generado correctamente.")
+            st.download_button(
+                "📥 Descargar Word", 
+                doc_word, 
+                f"Extincion_{nombre_adolescente.replace(' ', '_')}.docx"
+            )
         except Exception as e:
-            st.error(f"Error al procesar el PDF: {e}")
+            st.error(f"Error: {e}")
 
-st.markdown("---")
 st.caption("Aplicación hecha por Ignacio Badilla Lara")
