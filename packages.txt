@@ -1,1 +1,9 @@
 chromium-chromedriver
+chromium
+libnss3
+libgconf-2-4
+libfontconfig1
+libxrender1
+libxtst6
+libxi6
+libasound2
