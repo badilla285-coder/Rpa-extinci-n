@@ -3,5 +3,3 @@ python-docx
 PyPDF2
 selenium
 webdriver-manager
-requests
-beautifulsoup4
