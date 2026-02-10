@@ -1,83 +1,56 @@
 import streamlit as st
-from supabase import create_client, Client
-import pandas as pd
-from datetime import datetime
+from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+import PyPDF2, io, re, datetime
 
-# --- CONEXIÓN ---
-URL = st.secrets.get("SUPABASE_URL", "TU_URL")
-KEY = st.secrets.get("SUPABASE_KEY", "TU_KEY")
-supabase: Client = create_client(URL, KEY)
+# --- CONFIGURACIÓN DE ACCESO ---
+ADMIN_EMAIL = "badilla285@gmail.com"
+USUARIOS_AUTORIZADOS = [ADMIN_EMAIL]
 
-st.set_page_config(page_title="Nuestra App Custom", layout="wide")
+def check_auth():
+    if "auth" not in st.session_state: st.session_state.auth = False
+    if not st.session_state.auth:
+        st.title("🔐 Acceso Restringido - Suite Ignacio Badilla")
+        u = st.text_input("Correo Autorizado")
+        p = st.text_input("Contraseña", type="password")
+        if st.button("Ingresar"):
+            if u in USUARIOS_AUTORIZADOS and p == "nacho2026":
+                st.session_state.auth = True
+                st.rerun()
+            else: st.error("Acceso denegado.")
+        return False
+    return True
 
-# --- FUNCIONES CORE ---
-def obtener_items(categoria):
-    res = supabase.table('couple_data').select("*").eq('category', categoria).execute()
-    return res.data
+# --- FUNCIONES DE APOYO (EXTRACCIÓN Y LÓGICA) ---
+def aumentar(tipo): st.session_state[tipo] += 1
+def disminuir(tipo): 
+    if st.session_state[tipo] > 1: st.session_state[tipo] -= 1
 
-def guardar_item(categoria, contenido):
-    supabase.table('couple_data').insert({"category": categoria, "content": contenido}).execute()
+def extraer_info_pdf(archivo):
+    d = {"ruc":"","rit":"","juz":"","san":"","f_sent":"","f_ejec":""}
+    if archivo is None: return d
+    try:
+        reader = PyPDF2.PdfReader(archivo)
+        texto = "".join([p.extract_text() for p in reader.pages])
+        # RUC
+        r_ruc = re.search(r"RUC:\s?(\d{7,10}-[\dkK])", texto)
+        if r_ruc: d["ruc"] = r_ruc.group(1)
+        # RIT
+        r_rit = re.search(r"RIT:\s?([\d\w-]+-\d{4})", texto)
+        if r_rit: d["rit"] = r_rit.group(1)
+        # JUZGADO
+        r_juz = re.search(r"(Juzgado de Garantía de\s[\w\s]+)", texto, re.I)
+        if r_juz: d["juz"] = r_juz.group(1).strip()
+        # SANCIÓN
+        r_san = re.search(r"(condena a|pena de|sanción de).*?(\d+\s(años|días|meses).*?)(?=\.)", texto, re.I|re.S)
+        if r_san: d["san"] = r_san.group(0).replace("\n", " ").strip()
+        # FECHAS
+        fechas = re.findall(r"(\d{1,2}\sde\s\w+\sde\s\d{4})", texto)
+        if len(fechas) >= 1: d["f_sent"] = fechas[0]
+        if len(fechas) >= 2: d["f_ejec"] = fechas[1]
+    except: pass
+    return d
 
-# --- INTERFAZ DINÁMICA ---
-st.title("🛠️ Panel de Control Nacho & Fran")
-
-menu = st.sidebar.selectbox("Seleccionar Módulo", ["Dashboard", "Personalizador de Campos", "Registrar Datos", "Álbum y Archivos"])
-
-if menu == "Personalizador de Campos":
-    st.header("✨ Crea nuevos espacios")
-    st.info("Aquí defines qué campos quieres que tenga tu próximo registro (ej: 'Color', 'Ubicación', 'Calificación')")
-    
-    nuevo_modulo = st.text_input("Nombre del nuevo módulo (ej: Mis Restaurantes)")
-    campos = st.text_area("Nombres de los campos (separados por coma)", placeholder="Nombre, Dirección, Precio, Nota")
-    
-    if st.button("Crear Módulo"):
-        lista_campos = [c.strip() for c in campos.split(",")]
-        # Guardamos la configuración del módulo en una categoría especial 'config'
-        guardar_item("config_modulos", {"nombre": nuevo_modulo, "campos": lista_campos})
-        st.success(f"¡Módulo {nuevo_modulo} creado con éxito!")
-
-elif menu == "Registrar Datos":
-    st.header("📝 Registro de Actividades")
-    
-    # Cargamos los módulos que hemos creado dinámicamente
-    modulos_config = obtener_items("config_modulos")
-    opciones_modulos = [m['content']['nombre'] for m in modulos_config]
-    
-    if not opciones_modulos:
-        st.warning("Aún no has creado módulos. Ve a 'Personalizador de Campos'.")
-    else:
-        seleccion = st.selectbox("¿Qué quieres registrar hoy?", opciones_modulos)
-        
-        # Buscamos los campos de ese módulo
-        config_actual = next(m for m in modulos_config if m['content']['nombre'] == seleccion)
-        campos_a_llenar = config_actual['content']['campos']
-        
-        # Generamos el formulario dinámicamente
-        nuevo_registro = {}
-        with st.form("dynamic_form"):
-            st.write(f"### Nuevo ingreso para: {seleccion}")
-            for campo in campos_a_llenar:
-                nuevo_registro[campo] = st.text_input(campo)
-            
-            if st.form_submit_button("Guardar Registro"):
-                guardar_item(f"data_{seleccion}", nuevo_registro)
-                st.success("¡Datos guardados!")
-
-elif menu == "Dashboard":
-    st.header("📊 Ver nuestros datos")
-    modulos_config = obtener_items("config_modulos")
-    
-    for mod in modulos_config:
-        nombre_mod = mod['content']['nombre']
-        with st.expander(f"Ver {nombre_mod}"):
-            datos_raw = obtener_items(f"data_{nombre_mod}")
-            if datos_raw:
-                # Convertimos el JSON de Supabase en una tabla bonita de Pandas
-                df = pd.DataFrame([d['content'] for d in datos_raw])
-                st.table(df)
-                
-                # BOTÓN DESCARGABLE
-                csv = df.to_csv(index=False).encode('utf-8')
-                st.download_button(f"Descargar {nombre_mod} (CSV)", csv, f"{nombre_mod}.csv", "text/csv")
-            else:
-                st.write("No hay datos aún.")
+# --- MOTOR DE REDACCIÓN ---
+def generar_
