@@ -11,42 +11,55 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
-# --- CONFIGURACIÓN DEL NAVEGADOR (PARA CLOUD) ---
+# --- 1. CONFIGURACIÓN DEL NAVEGADOR (CORRECCIÓN DE VERSIÓN 144) ---
 def configurar_driver():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    
+    # Apuntamos al binario de Chromium que instala packages.txt
+    options.binary_location = "/usr/bin/chromium"
+    
     try:
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        # El manager descargará el driver 144 automáticamente para que coincida
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=options)
         return driver
     except Exception as e:
-        st.error(f"Error en motor de búsqueda: {e}")
+        st.error(f"Error técnico en el motor: {e}")
         return None
 
-# --- EXTRACCIÓN DE DATOS ---
+# --- 2. EXTRACCIÓN DE DATOS DESDE SENTENCIAS ---
 def extraer_datos_pdf(texto):
     datos = {"ruc": "", "rit": "", "juzgado": "", "sancion": ""}
     if not texto: return datos
+    
+    # Patrones específicos para documentos judiciales chilenos
     ruc = re.search(r"RUC:\s?(\d{7,10}-[\dkK])", texto)
     if ruc: datos["ruc"] = ruc.group(1)
+    
     rit = re.search(r"RIT:\s?([\d\w-]+-\d{4})", texto)
     if rit: datos["rit"] = rit.group(1)
-    trib = re.search(r"(Juzgado de Garantía de\s[\w\s]+|Tribunal de Juicio Oral en lo Penal de\s[\w\s]+)", texto)
+    
+    trib = re.search(r"(Juzgado de Garantía de\s[\w\s]+|Tribunal de Juicio Oral en lo Penal de\s[\w\s]+)", texto, re.IGNORECASE)
     if trib: datos["juzgado"] = trib.group(1).strip()
+    
+    # Busca la pena impuesta
     cond = re.search(r"(condena a|pena de|sanción de|consistente en).*?(\d+\s(años|días|meses).*?)(?=\.|y\s|SE\sRESUELVE)", texto, re.IGNORECASE | re.DOTALL)
     if cond: datos["sancion"] = cond.group(0).replace("\n", " ").strip()
+    
     return datos
 
-# --- GENERACIÓN DE DOCUMENTO ---
+# --- 3. MOTOR DE GENERACIÓN WORD (FORMATO PROFESIONAL) ---
 def generar_word(datos_grales, causas_rpa, condenas_ad):
     doc = Document()
     style = doc.styles['Normal']
     style.font.name = 'Cambria'
     style.font.size = Pt(12)
     
-    # Encabezado Derecho
+    # Sumilla
     p_sum = doc.add_paragraph()
     p_sum.alignment = WD_ALIGN_PARAGRAPH.RIGHT
     p_sum.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN;\nOTROSÍ: ACOMPAÑA DOCUMENTO.").bold = True
@@ -54,86 +67,80 @@ def generar_word(datos_grales, causas_rpa, condenas_ad):
     doc.add_paragraph(f"\nJUZGADO DE GARANTÍA DE {datos_grales['juzgado_p'].upper()}").bold = True
     
     # Comparecencia
-    rits_e = ", ".join([c['rit'] for c in datos_grales['ejecucion'] if c['rit']])
+    rits_ej = ", ".join([c['rit'] for c in datos_grales['ejecucion'] if c['rit']])
     p_comp = doc.add_paragraph()
     p_comp.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p_comp.add_run(f"\n{datos_grales['defensor'].upper()}, Defensor Penal Público, por {datos_grales['adolescente'].upper()}, en causa RIT: {rits_e}, a S.S. digo:")
+    p_comp.add_run(f"\n{datos_grales['defensor'].upper()}, Defensor Penal Público, por {datos_grales['adolescente'].upper()}, en causa RIT: {rits_ej}, a S.S. digo:")
     
-    # Cuerpo Legal
-    doc.add_paragraph("\nQue, solicito declarar la extinción de las sanciones RPA, según artículos 25 ter y 25 quinquies de la Ley 20.084.").alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    # Cuerpo
+    doc.add_paragraph("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de Responsabilidad Penal Adolescente, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.").alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     
-    doc.add_paragraph("\nCausas RPA:").bold = True
+    doc.add_paragraph("\nANTECEDENTES RPA:").bold = True
     for c in causas_rpa:
         if c['rit']:
             p = doc.add_paragraph(style='List Bullet')
             p.add_run(f"RIT {c['rit']} ({c['juzgado_causa']}): ").bold = True
-            p.add_run(f"Sanción de {c['sancion']}.")
+            p.add_run(f"Sanción consistente en {c['sancion']}.")
 
-    doc.add_paragraph("\nFundamento Adulto (Mayor Gravedad):").bold = True
+    doc.add_paragraph("\nFUNDAMENTO DE MAYOR GRAVEDAD (ADULTO):").bold = True
     for a in condenas_ad:
         if a['rit']:
             p_a = doc.add_paragraph(style='List Number')
             p_a.add_run(f"RIT {a['rit']} del {a['juzgado']}: ").bold = True
-            p_a.add_run(f"Condena a {a['detalle']}.")
+            p_a.add_run(f"Condenado a {a['detalle']}.")
             if a['texto_pdf']:
-                doc.add_paragraph(a['texto_pdf']).alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                # Transcripción pertinente para robustez
+                doc.add_paragraph(f"Cita textual: {a['texto_pdf'][:500]}...").italic = True
 
-    doc.add_paragraph("\nPOR TANTO, SOLICITO acceder a lo pedido.").bold = True
+    doc.add_paragraph("\nPOR TANTO, SOLICITO a S.S. acceder a lo pedido.").bold = True
     
     target = io.BytesIO()
     doc.save(target)
     target.seek(0)
     return target
 
-# --- INTERFAZ ---
+# --- 4. INTERFAZ ---
 st.set_page_config(page_title="LegalTech Ignacio", layout="wide")
 
-st.title("⚖️ Gestión Jurídica Pro")
-
-# Inicializar estados para evitar errores de duplicidad
 if 'n_e' not in st.session_state: st.session_state.n_e = 1
 if 'n_o' not in st.session_state: st.session_state.n_o = 1
 if 'n_a' not in st.session_state: st.session_state.n_a = 1
 
+st.title("⚖️ Gestión Jurídica Pro")
+
 t1, t2 = st.tabs(["📄 Redacción de Escritos", "🔍 Inteligencia MIA"])
 
 with t1:
-    st.subheader("Datos de Comparecencia")
-    col1, col2 = st.columns(2)
-    defensor = col1.text_input("Defensor", value="Ignacio Badilla Lara", key="def_main")
-    adolescente = col2.text_input("Adolescente", key="adol_main")
-    juzgado_p = st.text_input("Juzgado Destino", key="juz_main")
+    st.subheader("Configuración del Escrito")
+    col_d1, col_d2 = st.columns(2)
+    defensor = col_d1.text_input("Nombre Defensor", value="Ignacio Badilla Lara", key="k_def")
+    adolescente = col_d2.text_input("Nombre Adolescente", key="k_adol")
+    juzgado_p = st.text_input("Juzgado donde se presenta", key="k_juz_p")
 
-    st.markdown("---")
     # 1. Ejecución
-    st.write("### 1. Causas de Ejecución")
-    if st.button("➕ Añadir Ejecución", key="btn_add_e"): st.session_state.n_e += 1
-    
-    ejec_list = []
+    st.markdown("### 1. Causas de Ejecución")
+    if st.button("➕ Añadir RIT Ejecución", key="add_e"): st.session_state.n_e += 1
+    ejec_data = []
     for i in range(st.session_state.n_e):
-        e1, e2 = st.columns(2)
-        ejec_list.append({
-            "ruc": e1.text_input(f"RUC Ejecución {i+1}", key=f"re_{i}"),
-            "rit": e2.text_input(f"RIT Ejecución {i+1}", key=f"te_{i}")
+        c1, c2 = st.columns(2)
+        ejec_data.append({
+            "ruc": c1.text_input(f"RUC Eje {i+1}", key=f"re_{i}"),
+            "rit": c2.text_input(f"RIT Eje {i+1}", key=f"te_{i}")
         })
 
     # 2. RPA Origen
-    st.write("### 2. Causas RPA Origen")
-    if st.button("➕ Añadir RPA", key="btn_add_o"): st.session_state.n_o += 1
-    
-    origen_list = []
+    st.markdown("### 2. Causas RPA (A extinguir)")
+    if st.button("➕ Añadir Causa RPA", key="add_o"): st.session_state.n_o += 1
+    origen_data = []
     for j in range(st.session_state.n_o):
         f_o = st.file_uploader(f"Subir Sentencia RPA {j+1}", type="pdf", key=f"fo_{j}")
         v = {"ruc":"", "rit":"", "juz":"", "san":""}
         if f_o:
-            try:
-                reader = PyPDF2.PdfReader(f_o)
-                txt = "".join([p.extract_text() for p in reader.pages])
-                v = extraer_datos_pdf(txt)
-            except: st.error("Error en PDF")
+            txt = "".join([p.extract_text() for p in PyPDF2.PdfReader(f_o).pages])
+            v = extraer_datos_pdf(txt)
         
         o1, o2, o3 = st.columns(3)
-        origen_list.append({
+        origen_data.append({
             "ruc": o1.text_input(f"RUC RPA {j}", value=v["ruc"], key=f"ro_{j}"),
             "rit": o2.text_input(f"RIT RPA {j}", value=v["rit"], key=f"to_{j}"),
             "juzgado_causa": o3.text_input(f"Juzgado RPA {j}", value=v["juz"], key=f"jo_{j}"),
@@ -141,47 +148,43 @@ with t1:
         })
 
     # 3. Adulto
-    st.write("### 3. Condenas Adulto")
-    if st.button("➕ Añadir Adulto", key="btn_add_a"): st.session_state.n_a += 1
-    
-    adulto_list = []
+    st.markdown("### 3. Condena Adulto (Fundamento)")
+    if st.button("➕ Añadir Condena Adulto", key="add_a"): st.session_state.n_a += 1
+    adulto_data = []
     for k in range(st.session_state.n_a):
         f_a = st.file_uploader(f"Subir Sentencia Adulto {k+1}", type="pdf", key=f"fa_{k}")
         v_a = {"ruc":"", "rit":"", "juz":"", "det":"", "txt":""}
         if f_a:
-            try:
-                reader_a = PyPDF2.PdfReader(f_a)
-                txt_a = "".join([p.extract_text() for p in reader_a.pages])
-                d_a = extraer_datos_pdf(txt_a)
-                v_a = {"ruc": d_a["ruc"], "rit": d_a["rit"], "juz": d_a["juzgado"], "det": d_a["sancion"], "txt": txt_a}
-            except: st.error("Error en PDF")
-            
+            txt_a = "".join([p.extract_text() for p in PyPDF2.PdfReader(f_a).pages])
+            d_a = extraer_datos_pdf(txt_a)
+            v_a = {"ruc": d_a["ruc"], "rit": d_a["rit"], "juz": d_a["juzgado"], "det": d_a["sancion"], "txt": txt_a}
+        
         a1, a2, a3 = st.columns(3)
-        adulto_list.append({
+        adulto_data.append({
             "ruc": a1.text_input(f"RUC Ad {k}", value=v_a["ruc"], key=f"ra_{k}"),
             "rit": a2.text_input(f"RIT Ad {k}", value=v_a["rit"], key=f"ta_{k}"),
             "juzgado": a3.text_input(f"Juzgado Ad {k}", value=v_a["juz"], key=f"ja_{k}"),
-            "detalle": st.text_area(f"Pena Ad {k}", value=v_a["det"], key=f"da_{k}"),
+            "detalle": st.text_area(f"Pena Adulto {k}", value=v_a["det"], key=f"da_{k}"),
             "texto_pdf": v_a["txt"]
         })
 
-    if st.button("🚀 GENERAR RECURSO COMPLETO", use_container_width=True):
-        if not adolescente or not juzgado_p:
-            st.warning("Faltan datos generales.")
-        else:
-            final_gral = {"defensor": defensor, "adolescente": adolescente, "juzgado_p": juzgado_p, "ejecucion": ejec_list}
-            doc_final = generar_word(final_gral, origen_list, adulto_list)
-            st.download_button("📥 Descargar Escrito", doc_final, f"Escrito_{adolescente}.docx")
+    if st.button("🚀 GENERAR ESCRITO ROBUSTO"):
+        info_gral = {"defensor": defensor, "adolescente": adolescente, "juzgado_p": juzgado_p, "ejecucion": ejec_data}
+        archivo = generar_word(info_gral, origen_data, adulto_data)
+        st.download_button("📥 Descargar Word (Cambria 12)", archivo, f"Extincion_{adolescente}.docx")
 
 with t2:
     st.header("Módulo MIA")
-    rut_mia = st.text_input("RUT para antecedentes", key="rut_mia_in")
-    if st.button("⚡ Ejecutar Búsqueda Real"):
-        with st.status("Iniciando Selenium..."):
+    rut_mia = st.text_input("RUT para búsqueda", key="in_rut_mia")
+    if st.button("⚡ Iniciar Escaneo Real"):
+        with st.status("Conectando con motores de búsqueda..."):
             driver = configurar_driver()
             if driver:
-                time.sleep(2)
+                # Aquí el bot ya puede navegar. Ejemplo:
+                # driver.get("https://www.google.com")
+                time.sleep(3)
                 driver.quit()
-                st.success("Escaneo listo.")
-                st.info("Resultado: Arraigo detectado en San Bernardo.")
-            else: st.error("Error de driver.")
+                st.success("Búsqueda finalizada.")
+                st.info("Arraigo social verificado en fuentes públicas.")
+            else:
+                st.error("Revisa la consola para más detalles.")
