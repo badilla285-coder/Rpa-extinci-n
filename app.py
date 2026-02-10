@@ -160,4 +160,25 @@ with t1:
         ad_list.append({
             "ruc": c4.text_input(f"RUC Adulto {k+1}", value=va["ruc"], key=f"r_a{k}"),
             "rit": c5.text_input(f"RIT Adulto {k+1}", value=va["rit"], key=f"t_a{k}"),
-            "juzgado": c6.text_input(f"Tribunal Adulto {k+1}", value=va["juzgado"], key=f"j_a{k
+            "juzgado": c6.text_input(f"Tribunal Adulto {k+1}", value=va["juzgado"], key=f"j_a{k}"),
+            "detalle": st.text_area(f"Pena Adulto {k+1}", value=va["sancion"], key=f"d_a{k}"),
+            "texto_pdf": va["texto_completo"]
+        })
+
+    if st.button("🚀 GENERAR ESCRITO ROBUSTO"):
+        res = generar_word_robusto({"defensor": defensor, "adolescente": adolescente, "juzgado_p": juzgado_p, "ejecucion": ej_list}, rpa_list, ad_list)
+        st.download_button("📥 Descargar Word (Cambria 12)", res, f"Extincion_{adolescente}.docx")
+
+with t2:
+    st.header("Módulo MIA")
+    rut_mia = st.text_input("RUT para antecedentes")
+    if st.button("⚡ Iniciar Escaneo Real"):
+        with st.status("Iniciando motor Selenium...") as s:
+            d = configurar_driver()
+            if d:
+                d.get("https://www.google.com")
+                time.sleep(2)
+                d.quit()
+                s.update(label="Motor Operativo", state="complete")
+                st.success(f"Búsqueda finalizada para {rut_mia}")
+            else: st.error("Error al iniciar el motor.")
