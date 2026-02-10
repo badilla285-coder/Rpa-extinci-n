@@ -14,23 +14,23 @@ def crear_escrito(datos, texto_condena):
     p = doc.add_paragraph()
     p.add_run("SUMILLA: SOLICITA DECLARACIÓN DE EXTINCIÓN DE RESPONSABILIDAD PENAL.\n").bold = True
     for c in datos['causas']:
-        p.add_run(f"RIT: {c['rit']} / RUC: {c['ruc']}\n")
-    p.add_run(f"TRIBUNAL: {datos['juzgado']}\n")
+        p.add_run(f"RIT: {c['rit']} / RUC: {c['ruc']} - TRIBUNAL: {c['juzgado_causa']}\n")
+    p.add_run(f"TRIBUNAL DE EJECUCIÓN: {datos['juzgado_presentacion']}\n")
 
     doc.add_paragraph("\nEN LO PRINCIPAL: SOLICITA DECLARACIÓN DE EXTINCIÓN; OTROSÍ: ACOMPAÑA DOCUMENTO.")
     
     p_juez = doc.add_paragraph()
-    p_juez.add_run(f"\nS.J.L. DE GARANTÍA DE {datos['juzgado'].upper()}").bold = True
+    p_juez.add_run(f"\nS.J.L. DE GARANTÍA DE {datos['juzgado_presentacion'].upper()}").bold = True
 
     cuerpo = doc.add_paragraph()
     cuerpo.add_run(f"\n{datos['nombre_defensor']}, defensor penal público, por el adolescente {datos['nombre_adolescente']}, en las causas ya individualizadas, a SS. con respeto digo:\n")
     
-    rits = [f"RIT {c['rit']}" for c in datos['causas']]
-    texto_rits = ", ".join(rits)
+    # Detalle de causas en el cuerpo
+    texto_causas = "\n".join([f"RIT {c['rit']} del Juzgado de {c['juzgado_causa']}" for c in datos['causas']])
     
-    cuerpo.add_run(f"\nQue, de conformidad a la Ley 20.084, solicito se declare la extinción de la responsabilidad penal en las causas {texto_rits}, por haber sido mi representado condenado por un tribunal de adultos a una pena privativa de libertad, lo que resulta incompatible con la ejecución de las sanciones RPA.\n")
+    cuerpo.add_run(f"\nQue, de conformidad a la Ley 20.084, solicito se declare la extinción de la responsabilidad penal en las causas: \n{texto_causas}, \npor haber sido mi representado condenado por un tribunal de adultos a una pena privativa de libertad, lo que resulta incompatible con la ejecución de las sanciones RPA.\n")
 
-    # AQUÍ SE PEGA EL TEXTO DEL PDF DIRECTAMENTE
+    # TEXTO DEL PDF
     doc.add_paragraph(texto_condena)
     
     p_final = doc.add_paragraph()
@@ -47,7 +47,7 @@ st.title("⚖️ Generador de Extinciones")
 
 nombre_defensor = st.text_input("Nombre Defensor")
 nombre_adolescente = st.text_input("Nombre Adolescente")
-juzgado = st.text_input("Juzgado (Ej: San Bernardo)")
+juzgado_presentacion = st.text_input("Juzgado donde se presenta (Ej: San Bernardo)")
 
 st.subheader("Causas RPA")
 if 'n_causas' not in st.session_state:
@@ -63,12 +63,15 @@ with col_btn2:
 
 causas_lista = []
 for i in range(st.session_state.n_causas):
-    c1, c2 = st.columns(2)
+    st.markdown(f"**Causa {i+1}**")
+    c1, c2, c3 = st.columns(3)
     with c1:
-        ruc_v = st.text_input(f"RUC {i+1}", key=f"ruc_{i}")
+        ruc_v = st.text_input(f"RUC", key=f"ruc_{i}")
     with c2:
-        rit_v = st.text_input(f"RIT {i+1}", key=f"rit_{i}")
-    causas_lista.append({"ruc": ruc_v, "rit": rit_v})
+        rit_v = st.text_input(f"RIT", key=f"rit_{i}")
+    with c3:
+        juz_v = st.text_input(f"Juzgado de la causa", key=f"juz_{i}")
+    causas_lista.append({"ruc": ruc_v, "rit": rit_v, "juzgado_causa": juz_v})
 
 # BOTÓN PARA ADJUNTAR EL PDF
 pdf_file = st.file_uploader("Adjuntar PDF Condena Adulto", type="pdf")
@@ -86,7 +89,7 @@ if st.button("Generar Escrito"):
             info = {
                 "nombre_defensor": nombre_defensor,
                 "nombre_adolescente": nombre_adolescente,
-                "juzgado": juzgado,
+                "juzgado_presentacion": juzgado_presentacion,
                 "causas": causas_lista
             }
             
