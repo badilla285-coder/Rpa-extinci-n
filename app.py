@@ -18,12 +18,11 @@ def configurar_driver():
         s = Service("/usr/bin/chromedriver")
         return webdriver.Chrome(service=s, options=o)
     except:
-        try:
-            return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=o)
+        try: return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=o)
         except: return None
 
 def extraer(f):
-    d = {"ruc": "", "rit": "", "juz": "", "san": "", "txt": ""}
+    d = {"ruc":"","rit":"","juz":"","san":"","txt":""}
     if f is None: return d
     try:
         pdf = PyPDF2.PdfReader(f)
@@ -46,7 +45,7 @@ def gen_doc(dg, cr, ca):
     s.font.name, s.font.size = 'Cambria', Pt(12)
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p.add_run("EN LO PRINCIPAL: SOLICITA DECLARACIÓN DE EXTINCIÓN RPA;\nOTROSÍ: ACOMPAÑA DOCUMENTOS.").bold = True
+    p.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN RPA;\nOTROSÍ: ACOMPAÑA.").bold = True
     doc.add_paragraph(f"\nS. J. DE GARANTÍA DE {dg['jp'].upper()}").bold = True
     rits = ", ".join([f"{c['rit']} (RUC: {c['ruc']})" for c in dg['ej'] if c['rit']])
     p2 = doc.add_paragraph()
@@ -66,38 +65,66 @@ def gen_doc(dg, cr, ca):
             pa.add_run(f"RIT {a['rit']} (RUC {a['ruc']}) de {a['juz']}: ").bold = True
             pa.add_run(f"Condenado a {a['det']}.")
     doc.add_paragraph("\nPOR TANTO, PIDO A US. acceder.").bold = True
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
+    buf = io.BytesIO(); doc.save(buf); buf.seek(0)
     return buf
 
 st.set_page_config(page_title="LegalTech Ignacio", layout="wide")
-for k in ['ne', 'nr', 'na']:
+for k in ['ne','nr','na']:
     if k not in st.session_state: st.session_state[k] = 1
 
 st.title("⚖️ Gestión Jurídica Pro")
-t1, t2 = st.tabs(["📄 Redactor de Escritos", "🔍 Inteligencia MIA"])
+t1, t2 = st.tabs(["📄 Redactor", "🔍 MIA"])
 
 with t1:
     d_f = st.text_input("Defensor", value="Ignacio Badilla Lara")
     a_d = st.text_input("Adolescente")
     j_p = st.text_input("Juzgado Destino")
-    
-    st.subheader("1. Causas de Ejecución")
-    c_e1, c_e2 = st.columns(2)
-    if c_e1.button("➕ Añadir Causa Ejecución"): st.session_state.ne += 1
-    if c_e2.button("➖ Quitar Causa Ejecución") and st.session_state.ne > 1: st.session_state.ne -= 1
+    st.subheader("1. Ejecución")
+    e1, e2 = st.columns(2)
+    if e1.button("➕ Causa Ejecución"): st.session_state.ne += 1
+    if e2.button("➖ Quitar Ejecución") and st.session_state.ne > 1: st.session_state.ne -= 1
     le = []
     for i in range(st.session_state.ne):
-        col1, col2 = st.columns(2)
-        le.append({"ruc": col1.text_input(f"RUC E {i+1}", key=f"re{i}"), "rit": col2.text_input(f"RIT E {i+1}", key=f"te{i}")})
-
-    st.subheader("2. Causas RPA (A extinguir)")
-    c_r1, c_r2 = st.columns(2)
-    if c_r1.button("➕ Añadir RPA"): st.session_state.nr += 1
-    if c_r2.button("➖ Quitar RPA") and st.session_state.nr > 1: st.session_state.nr -= 1
+        c1, c2 = st.columns(2)
+        le.append({"ruc": c1.text_input(f"RUC E {i}", key=f"re{i}"), "rit": c2.text_input(f"RIT E {i}", key=f"te{i}")})
+    st.subheader("2. RPA")
+    r1, r2 = st.columns(2)
+    if r1.button("➕ RPA"): st.session_state.nr += 1
+    if r2.button("➖ RPA") and st.session_state.nr > 1: st.session_state.nr -= 1
     lr = []
     for j in range(st.session_state.nr):
-        f = st.file_uploader(f"Sentencia RPA {j+1}", key=f"fr{j}")
+        f = st.file_uploader(f"Sentencia R {j}", key=f"fr{j}")
         v = extraer(f); c1, c2, c3 = st.columns(3)
-        lr.append({"ruc": c1.text_input(f"RUC R {j}", value=v["ruc"], key=f"rr{j}"), "rit": c2.text_input(f"RIT R {j}", value=v["rit"], key=f"tr{j}"), "juz": c3.text_input
+        lr.append({"ruc":c1.text_input(f"RUC R {j}",value=v["ruc"],key=f"rr{j}"),"rit":c2.text_input(f"RIT R {j}",value=v["rit"],key=f"tr{j}"),"juz":c3.text_input(f"Trib R {j}",value=v["juz"],key=f"jr{j}"),"san":st.text_area(f"San R {j}",value=v["san"],key=f"sr{j}")})
+    st.subheader("3. Adulto")
+    a1, a2 = st.columns(2)
+    if a1.button("➕ Adulto"): st.session_state.na += 1
+    if a2.button("➖ Adulto") and st.session_state.na > 1: st.session_state.na -= 1
+    la = []
+    for k in range(st.session_state.na):
+        fa = st.file_uploader(f"Sentencia A {k}", key=f"fa{k}")
+        va = extraer(fa); cl1, cl2, cl3 = st.columns(3)
+        la.append({"ruc":cl1.text_input(f"RUC A {k}",value=va["ruc"],key=f"ra{k}"),"rit":cl2.text_input(f"RIT A {k}",value=va["rit"],key=f"ta{k}"),"juz":cl3.text_input(f"Trib A {k}",value=va["juz"],key=f"ja{k}"),"det":st.text_area(f"Pena A {k}",value=va["san"],key=f"da{k}")})
+    if st.button("🚀 GENERAR"):
+        res = gen_doc({"def":d_f,"ado":a_d,"jp":j_p,"ej":le}, lr, la)
+        st.download_button("📥 Descargar", res, f"Extincion_{a_d}.docx")
+
+with t2:
+    st.header("Módulo MIA")
+    r_m = st.text_input("RUT a investigar (con guion)")
+    if r_m:
+        r_l = r_m.replace(".","").replace("-",""); r_n = r_l[:-1]; ca, cb = st.columns(2)
+        with ca:
+            st.link_button("⚖️ PJUD", "https://oficinajudicialvirtual.pjud.cl/")
+            st.link_button("👤 Rutificador", f"https://www.nombrerutyfirma.com/rut/{r_n}")
+        with cb:
+            st.link_button("🔍 Redes", f"https://www.google.com/search?q={r_m}+facebook+instagram")
+            st.link_button("🗳️ SERVEL", "https://consulta.servel.cl/")
+        if st.button("⚡ Escaneo"):
+            with st.status("MIA...") as s:
+                d = configurar_driver()
+                if d:
+                    d.get(f"https://www.google.com/search?q={r_m}")
+                    time.sleep(1); d.quit()
+                    s.update(label="Fin", state="complete"); st.success("OK")
+                else: st.error("Error motor")
