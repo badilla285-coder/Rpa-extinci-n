@@ -10,6 +10,7 @@ def crear_escrito(datos, texto_condena):
     style.font.name = 'Arial'
     style.font.size = Pt(12)
 
+    # SUMILLA
     p = doc.add_paragraph()
     p.add_run("SUMILLA: SOLICITA DECLARACIÓN DE EXTINCIÓN DE RESPONSABILIDAD PENAL.\n").bold = True
     for c in datos['causas']:
@@ -29,7 +30,7 @@ def crear_escrito(datos, texto_condena):
     
     cuerpo.add_run(f"\nQue, de conformidad a la Ley 20.084, solicito se declare la extinción de la responsabilidad penal en las causas {texto_rits}, por haber sido mi representado condenado por un tribunal de adultos a una pena privativa de libertad, lo que resulta incompatible con la ejecución de las sanciones RPA.\n")
 
-    doc.add_paragraph("\nFUNDAMENTOS DE LA CONDENA DE ADULTO:").bold = True
+    # AQUÍ SE PEGA EL TEXTO DEL PDF DIRECTAMENTE
     doc.add_paragraph(texto_condena)
     
     p_final = doc.add_paragraph()
@@ -67,4 +68,33 @@ for i in range(st.session_state.n_causas):
         ruc_v = st.text_input(f"RUC {i+1}", key=f"ruc_{i}")
     with c2:
         rit_v = st.text_input(f"RIT {i+1}", key=f"rit_{i}")
-    causas_lista.append
+    causas_lista.append({"ruc": ruc_v, "rit": rit_v})
+
+# BOTÓN PARA ADJUNTAR EL PDF
+pdf_file = st.file_uploader("Adjuntar PDF Condena Adulto", type="pdf")
+
+if st.button("Generar Escrito"):
+    if not pdf_file or not nombre_defensor:
+        st.error("Debe adjuntar el PDF y completar los nombres.")
+    else:
+        try:
+            reader = PyPDF2.PdfReader(pdf_file)
+            txt_pdf = ""
+            for page in reader.pages:
+                txt_pdf += page.extract_text() + "\n"
+            
+            info = {
+                "nombre_defensor": nombre_defensor,
+                "nombre_adolescente": nombre_adolescente,
+                "juzgado": juzgado,
+                "causas": causas_lista
+            }
+            
+            doc_word = crear_escrito(info, txt_pdf)
+            st.success("Escrito generado.")
+            st.download_button("📥 Descargar Word", doc_word, f"Extincion_{nombre_adolescente}.docx")
+        except Exception as e:
+            st.error(f"Error al procesar el PDF: {e}")
+
+st.markdown("---")
+st.caption("Aplicación hecha por Ignacio Badilla Lara")
