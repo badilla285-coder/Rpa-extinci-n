@@ -2,6 +2,7 @@ import fitz  # PyMuPDF
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import os
 
 class GeneradorJuridico:
     def __init__(self):
@@ -9,15 +10,23 @@ class GeneradorJuridico:
         self.tamaño_cuerpo = 11
 
     def leer_sentencia(self, ruta_pdf):
-        """Extrae el texto íntegro para cumplir con la no reducción de info."""
+        """Extrae el texto íntegro. Si es imagen, avisa para evitar omisiones."""
         try:
+            if not os.path.exists(ruta_pdf):
+                return f"[ERROR: El archivo {ruta_pdf} no se encuentra en el servidor]"
+            
             texto = ""
             with fitz.open(ruta_pdf) as doc:
                 for pagina in doc:
+                    texto += f"\n--- Página {pagina.number + 1} ---\n"
                     texto += pagina.get_text("text")
-            return texto if texto else "[No se pudo extraer texto del PDF]"
-        except:
-            return "[Error al leer el archivo PDF]"
+            
+            if not texto.strip() or len(texto) < 50:
+                return "[ADVERTENCIA: El PDF parece ser una imagen escaneada. La transcripción automática no es posible sin OCR.]"
+            
+            return texto
+        except Exception as e:
+            return f"[Error crítico al leer el PDF: {str(e)}]"
 
     def aplicar_estilo(self, parrafo, negrita=False, alineacion=WD_ALIGN_PARAGRAPH.JUSTIFY):
         parrafo.alignment = alineacion
@@ -30,89 +39,94 @@ class GeneradorJuridico:
     def crear_escrito(self, datos, texto_sentencia):
         doc = Document()
         
-        # Configuración de márgenes profesionales
+        # Configuración de márgenes (estándar judicial chileno)
         for section in doc.sections:
             section.left_margin = Inches(1.2)
             section.right_margin = Inches(1.0)
 
-        # Encabezado DPP
-        h = doc.add_paragraph("Defensoría\nSin defensa no hay Justicia")
+        # 1. ENCABEZADO
+        h = doc.add_paragraph("Defensoría Penal Pública\nSin defensa no hay Justicia")
         self.aplicar_estilo(h, alineacion=WD_ALIGN_PARAGRAPH.LEFT)
 
-        # SUMA
-        suma = doc.add_paragraph()
-        run_s = suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN;\n")
+        # 2. SUMA
+        suma_table = doc.add_table(rows=1, cols=2)
+        suma_table.columns[0].width = Inches(3.5)
+        cell = suma_table.cell(0, 1)
+        p_suma = cell.paragraphs[0]
+        run_s = p_suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN DE SANCIONES ART. 25 TER Y QUINQUIES LEY 20.084;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
         run_s.bold = True
-        run_s.font.size = Pt(12)
-        run_o = suma.add_run("OTROSÍ: ACOMPAÑA DOCUMENTO.")
-        run_o.bold = True
-        self.aplicar_estilo(suma, alineacion=WD_ALIGN_PARAGRAPH.LEFT)
+        run_s.font.size = Pt(11)
+        run_s.font.name = self.fuente
 
-        # Tribunal
-        t = doc.add_paragraph(f"\nJUZGADO DE GARANTÍA DE {datos.get('tribunal', 'SAN BERNARDO').upper()}")
+        # 3. TRIBUNAL
+        t = doc.add_paragraph(f"\nS.J.L. DE GARANTÍA DE {datos.get('tribunal', 'SAN BERNARDO').upper()}")
         self.aplicar_estilo(t, negrita=True)
 
-        # Comparecencia
+        # 4. COMPARECENCIA
         c = doc.add_paragraph(
-            f"\n{datos.get('nombre', 'IGNACIO BADILLA LARA')}, Postulante, Defensoría Penal Pública, "
+            f"\n{datos.get('nombre', 'IGNACIO BADILLA LARA').upper()}, Postulante de la Corporación de Asistencia Judicial, "
             f"en representación de {datos.get('imputado', '________________')}, en causa RIT: {datos.get('rit_rpa', '____')}, "
-            f"RUC: {datos.get('ruc_rpa', '____')}, a S.S., respetuosamente digo:"
+            f"RUC: {datos.get('ruc_rpa', '____')}, a S.S. con respeto digo:"
         )
         self.aplicar_estilo(c)
 
-        # Cuerpo Normativo
+        # 5. CUERPO - HECHOS Y DERECHO
         p1 = doc.add_paragraph(
-            "\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de "
-            "Responsabilidad Penal Adolescente, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084."
+            "\nQue, por este acto, vengo en solicitar se declare la extinción de pleno derecho de las sanciones "
+            "impuestas en la causa RPA individualizada, por concurrir los presupuestos legales de los artículos 25 ter y 25 quinquies "
+            "de la Ley 20.084, atendida la imposición de una pena de mayor gravedad como adulto."
         )
         self.aplicar_estilo(p1)
 
-        # Causa RPA
-        p2 = doc.add_paragraph(f"\n1. RIT: {datos.get('rit_rpa', '____')}, RUC: {datos.get('ruc_rpa', '____')}: ")
+        # 6. ANTECEDENTES DE LA CAUSA RPA
+        p2 = doc.add_paragraph(f"\nI. ANTECEDENTES CAUSA RPA (RIT: {datos.get('rit_rpa', '____')})")
         self.aplicar_estilo(p2, negrita=True)
-        p2.add_run(f"Sancionado por el Juzgado de Garantía de {datos.get('comuna_rpa', '____')} a la pena de {datos.get('pena_rpa', '____')}.")
+        p2_det = doc.add_paragraph(f"Sancionado por el Tribunal de {datos.get('comuna_rpa', '____')} a la pena de {datos.get('pena_rpa', '____')}.")
+        self.aplicar_estilo(p2_det)
 
-        # Causa Adulto (Aquí va el texto ÍNTEGRO de la sentencia)
-        p3 = doc.add_paragraph("\n2. SENTENCIA DE ADULTO (TRANSCRIPCIÓN ÍNTEGRA):")
+        # 7. TRANSCRIPCIÓN ÍNTEGRA SENTENCIA ADULTO
+        p3 = doc.add_paragraph("\nII. SENTENCIA CAUSA ADULTO - TRANSCRIPCIÓN ÍNTEGRA:")
         self.aplicar_estilo(p3, negrita=True)
         
-        # Insertamos el texto extraído sin resumir
+        # Texto íntegro del PDF
         p_texto = doc.add_paragraph(texto_sentencia)
         self.aplicar_estilo(p_texto)
 
-        # Fundamento Jurídico Robusto (Copiado del modelo Alarcón)
-        p4 = doc.add_paragraph(
-            "\nSe hace presente que el artículo 25 ter en su inciso tercero establece que se "
-            "considerará más grave el delito o conjunto de ellos que tuviere asignada en la ley una "
-            "mayor pena de conformidad con las reglas generales. En el presente caso, la sanción "
-            "impuesta como adulto reviste una mayor gravedad, configurándose así los presupuestos para la extinción."
+        # 8. FUNDAMENTOS JURÍDICOS
+        p4 = doc.add_paragraph("\nIII. FUNDAMENTOS:")
+        self.aplicar_estilo(p4, negrita=True)
+        fundamento = (
+            "El artículo 25 ter inciso tercero dispone que se considerará más grave el delito que tuviere asignada "
+            "una mayor pena de conformidad con las reglas generales. Constatándose que mi representado se encuentra "
+            "cumpliendo una sanción de mayor entidad, la pena anterior debe declararse extinguida por el solo ministerio de la ley."
         )
-        self.aplicar_estilo(p4)
+        self.aplicar_estilo(doc.add_paragraph(fundamento))
 
-        # Petitoria
+        # 9. PETITORIA
         p5 = doc.add_paragraph("\nPOR TANTO,")
         self.aplicar_estilo(p5)
-        p6 = doc.add_paragraph("SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción referida.")
+        p6 = doc.add_paragraph("SOLICITO A S.S. tener por interpuesta la solicitud y declarar la extinción de la sanción referida.")
         self.aplicar_estilo(p6)
 
         nombre_archivo = f"Extincion_{datos.get('imputado', 'Escrito')}.docx"
         doc.save(nombre_archivo)
-        print(f"Archivo generado con éxito: {nombre_archivo}")
+        return nombre_archivo
 
-# --- USO PRÁCTICO ---
+# --- USO ---
 if __name__ == "__main__":
     app = GeneradorJuridico()
+    # Cambia 'sentencia.pdf' por el nombre real de tu archivo
+    texto_extraido = app.leer_sentencia("sentencia.pdf")
     
-    # 1. Lee el PDF (Asegúrate de que el nombre del archivo sea igual al que tienes)
-    texto = app.leer_sentencia("sentencia_ejemplo.pdf") 
-    
-    # 2. Datos para rellenar
     mis_datos = {
+        "nombre": "IGNACIO BADILLA LARA",
         "imputado": "JUAN PEREZ",
         "rit_rpa": "1587-2018",
         "ruc_rpa": "1800174694-0",
         "pena_rpa": "2 años de libertad asistida especial",
-        "tribunal": "San Bernardo"
+        "tribunal": "San Bernardo",
+        "comuna_rpa": "San Bernardo"
     }
     
-    app.crear_escrito(mis_datos, texto)
+    archivo = app.crear_escrito(mis_datos, texto_extraido)
+    print(f"Escrito generado: {archivo}")
