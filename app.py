@@ -6,165 +6,208 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 import re
 
-class GeneradorJuridico:
+# --- CONFIGURACIÓN Y SEGURIDAD ---
+def check_password():
+    def password_entered():
+        if st.session_state["email"] == "badilla285@gmail.com" and st.session_state["password"] == "nacho2026":
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+            del st.session_state["email"]
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        st.title("🔐 Acceso Sistema Judicial")
+        st.text_input("Correo electrónico", key="email")
+        st.text_input("Contraseña", type="password", key="password")
+        st.button("Ingresar", on_click=password_entered)
+        return False
+    elif not st.session_state["password_correct"]:
+        st.error("Credenciales incorrectas")
+        return False
+    return True
+
+# --- LÓGICA DE EXTRACCIÓN Y PROCESAMIENTO ---
+class GeneradorPro:
     def __init__(self):
-        self.fuente = "Century Gothic"
-        self.tamaño_cuerpo = 11
+        self.fuente = "Cambria"
+        self.size = 12
 
-    def extraer_datos_inteligente(self, texto):
-        """Intenta encontrar RIT, RUC y Tribunal automáticamente en el texto."""
-        datos = {
-            "rit": "",
-            "ruc": "",
-            "tribunal": "San Bernardo",
-            "imputado": ""
-        }
-        # Patrón RIT: números - año
-        rit_match = re.search(r"\b(\d+-\d{4})\b", texto)
-        if rit_match: datos["rit"] = rit_match.group(1)
-        
-        # Patrón RUC: números - dígito
-        ruc_match = re.search(r"\b(\d{10}-\w)\b", texto)
-        if ruc_match: datos["ruc"] = ruc_match.group(1)
-        
-        # Intento de Tribunal
-        if "GARANTIA DE" in texto.upper():
-            trib_match = re.search(r"GARANTIA DE\s+([A-Z\sáéíóúÁÉÍÓÚ]+)", texto.upper())
-            if trib_match: datos["tribunal"] = trib_match.group(1).strip()
-            
-        return datos
-
-    def leer_sentencia(self, archivo_pdf):
-        try:
-            pdf_bytes = archivo_pdf.read()
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            texto = ""
+    def extraer_datos_pdf(self, file):
+        texto = ""
+        with fitz.open(stream=file.read(), filetype="pdf") as doc:
             for pagina in doc:
-                texto += f"\n--- PÁGINA {pagina.number + 1} ---\n"
-                texto += pagina.get_text("text")
-            doc.close()
-            return texto
-        except Exception as e:
-            st.error(f"Error al leer el PDF: {e}")
-            return None
+                texto += pagina.get_text()
+        
+        # Búsqueda inteligente
+        rit = re.search(r"RIT[:\s]+(\d+-\d{4})", texto, re.I)
+        ruc = re.search(r"RUC[:\s]+(\d{10}-\w)", texto, re.I)
+        trib = re.search(r"Juzgado de Garantía de\s+([a-zA-Z\s]+)", texto, re.I)
+        
+        return {
+            "rit": rit.group(1) if rit else "",
+            "ruc": ruc.group(1) if ruc else "",
+            "tribunal": trib.group(1).strip() if trib else "",
+            "texto_completo": texto
+        }
 
-    def crear_escrito(self, datos, texto_sentencia):
+    def crear_docx(self, data):
         doc = Document()
+        # Estilo Base
+        style = doc.styles['Normal']
+        style.font.name = self.fuente
+        style.font.size = Pt(self.size)
+
         for section in doc.sections:
-            section.left_margin, section.right_margin = Inches(1.2), Inches(1.0)
+            section.left_margin = Inches(1.2)
+            section.right_margin = Inches(1.0)
 
-        def aplicar_estilo(parrafo, negrita=False, alineacion=WD_ALIGN_PARAGRAPH.JUSTIFY):
-            parrafo.alignment = alineacion
-            run = parrafo.add_run()
+        def add_p(texto, bold=False, indent=True):
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            if indent: p.paragraph_format.first_line_indent = Inches(0.5)
+            run = p.add_run(texto)
+            run.bold = bold
             run.font.name = self.fuente
-            run.font.size = Pt(self.tamaño_cuerpo)
-            run.bold = negrita
-            return run
+            run.font.size = Pt(self.size)
+            return p
 
-        # Encabezado
-        h = doc.add_paragraph("Defensoría Penal Pública\nSin defensa no hay Justicia")
-        aplicar_estilo(h, alineacion=WD_ALIGN_PARAGRAPH.LEFT)
-
-        # SUMA PROFESIONAL (Alineada a la derecha)
+        # 1. SUMA
         table = doc.add_table(rows=1, cols=2)
-        table.columns[0].width = Inches(3.5)
         p_suma = table.cell(0, 1).paragraphs[0]
-        r_s = p_suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN DE SANCIONES ART. 25 TER Y QUINQUIES LEY 20.084;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
-        r_s.bold, r_s.font.name, r_s.font.size = True, self.fuente, Pt(11)
+        p_suma.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r_suma = p_suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN DE SANCIÓN RPA;\nOTROSÍ: ACOMPAÑA DOCUMENTOS.")
+        r_suma.bold = True
 
-        # Tribunal y Comparecencia
-        aplicar_estilo(doc.add_paragraph(f"\nS.J.L. DE GARANTÍA DE {datos['tribunal'].upper()}"), negrita=True)
+        # 2. CUERPO
+        add_p(f"\nS.J.L. DE GARANTÍA DE {data['individualizacion']['juzgado'].upper()}", bold=True, indent=False)
         
-        c_text = (f"\n{datos['nombre'].upper()}, Postulante, Defensoría Penal Pública San Bernardo, "
-                  f"en representación de {datos['imputado'].upper()}, en causa RIT: {datos['rit_rpa']}, "
-                  f"RUC: {datos['ruc_rpa']}, a S.S., respetuosamente digo:")
-        aplicar_estilo(doc.add_paragraph(c_text))
+        comp = (f"\n{data['individualizacion']['defensor'].upper()}, Defensor Penal Público, en representación de "
+                f"{data['individualizacion']['adolescente'].upper()}, en causa RIT: {data['individualizacion']['rit']}, "
+                f"RUC: {data['individualizacion']['ruc']}, a S.S. respetuosamente digo:")
+        add_p(comp, indent=False)
 
-        # Cuerpo
-        aplicar_estilo(doc.add_paragraph("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley 20.084..."))
-        
-        aplicar_estilo(doc.add_paragraph(f"\nI. ANTECEDENTES CAUSA RPA"), negrita=True)
-        aplicar_estilo(doc.add_paragraph(f"Sancionado por el Juzgado de Garantía de {datos['comuna_rpa']} a la pena de {datos['pena_rpa']}."))
+        add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley 20.084, en virtud del "
+              "artículo 25 ter y 25 quinquies del referido cuerpo legal.", bold=True)
 
-        aplicar_estilo(doc.add_paragraph("\nII. SENTENCIA CAUSA ADULTO - TRANSCRIPCIÓN ÍNTEGRA:"), negrita=True)
-        aplicar_estilo(doc.add_paragraph(texto_sentencia))
+        add_p("\nI. CAUSAS RPA SANCIONADAS", bold=True, indent=False)
+        for causa in data['causas_rpa']:
+            txt_causa = f"Causa RIT: {causa['rit']}, RUC: {causa['ruc']}, del Juzgado de {causa['juzgado']}, sancionado a {causa['sancion']}."
+            add_p(txt_causa)
 
-        aplicar_estilo(doc.add_paragraph("\nIII. FUNDAMENTOS JURÍDICOS"), negrita=True)
-        fundamento = ("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave "
-                      "el delito que tuviere asignada una mayor pena... configurándose los presupuestos para la extinción.")
-        aplicar_estilo(doc.add_paragraph(fundamento))
+        add_p("\nII. FUNDAMENTO DE EXTINCIÓN (CONDENA ADULTO)", bold=True, indent=False)
+        for cond in data['condenas_adulto']:
+            txt_cond = (f"Consta condena como adulto en causa RIT: {cond['rit']}, RUC: {cond['ruc']} del Juzgado de {cond['juzgado']}, "
+                        f"donde se impuso la pena de {cond['pena']}. Atendido que dicha sanción reviste una mayor gravedad, "
+                        "se configuran los presupuestos legales para la extinción de pleno derecho.")
+            add_p(txt_cond)
 
-        aplicar_estilo(doc.add_paragraph("\nPOR TANTO,"))
-        aplicar_estilo(doc.add_paragraph("SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción referida."))
+        add_p("\nPOR TANTO,", indent=False)
+        add_p("SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho las sanciones RPA individualizadas.")
+
+        add_p("\nOTROSÍ: Acompaña sentencias de adulto causas " + ", ".join([f"RIT {c['rit']}" for c in data['condenas_adulto']]) + ".", bold=True, indent=False)
+        add_p("POR TANTO, SOLICITO A S.S. tenerlas por acompañadas.")
 
         target = io.BytesIO()
         doc.save(target)
         target.seek(0)
         return target
 
-# --- INTERFAZ STREAMLIT ---
-st.set_page_config(page_title="Generador RPA Nacho", page_icon="⚖️", layout="centered")
+# --- INTERFAZ ---
+if check_password():
+    st.set_page_config(page_title="Generador Pro", layout="wide")
+    st.title("⚖️ Generador de Extinciones Jurídicas")
+    
+    if "historial" not in st.session_state: st.session_state.historial = []
+    
+    menu = st.sidebar.radio("Navegación", ["Generador", "Historial"])
 
-st.title("⚖️ Generador Inteligente RPA")
-st.write("Sube la sentencia y el sistema rellenará los campos automáticamente.")
+    if menu == "Generador":
+        gp = GeneradorPro()
+        
+        # 1. Individualización
+        st.subheader("1. Individualización")
+        c1, c2, c3, c4 = st.columns(4)
+        defensor = c1.text_input("Defensor", "IGNACIO BADILLA LARA")
+        adolescente = c2.text_input("Adolescente")
+        juzgado_e = c3.text_input("Juzgado (Ejecución)")
+        rit_e = c4.text_input("RIT Principal")
+        ruc_e = c1.text_input("RUC Principal")
 
-# 1. Carga de Archivo
-archivo = st.file_uploader("📂 Primero, sube la Sentencia de Adulto (PDF)", type="pdf")
+        # 2. Causas RPA
+        st.subheader("2. Causas RPA Sancionadas")
+        if "causas_rpa" not in st.session_state: st.session_state.causas_rpa = [{"rit": "", "ruc": "", "juzgado": "", "sancion": ""}]
+        
+        for i, causa in enumerate(st.session_state.causas_rpa):
+            with st.container():
+                cols = st.columns([2, 2, 2, 3, 1])
+                causa["rit"] = cols[0].text_input(f"RIT", causa["rit"], key=f"rit_rpa_{i}")
+                causa["ruc"] = cols[1].text_input(f"RUC", causa["ruc"], key=f"ruc_rpa_{i}")
+                causa["juzgado"] = cols[2].text_input(f"Juzgado", causa["juzgado"], key=f"juz_rpa_{i}")
+                causa["sancion"] = cols[3].text_input(f"Sanción", causa["sancion"], key=f"san_rpa_{i}")
+                if cols[4].button("🗑️", key=f"del_rpa_{i}"):
+                    st.session_state.causas_rpa.pop(i)
+                    st.rerun()
 
-# Inicializar estados para los campos
-if "datos_extraidos" not in st.session_state:
-    st.session_state.datos_extraidos = {"rit": "", "ruc": "", "tribunal": "San Bernardo", "texto": ""}
+        if st.button("➕ Añadir Causa RPA"):
+            st.session_state.causas_rpa.append({"rit": "", "ruc": "", "juzgado": "", "sancion": ""})
+            st.rerun()
 
-if archivo:
-    gen = GeneradorJuridico()
-    texto = gen.leer_sentencia(archivo)
-    if texto:
-        st.session_state.datos_extraidos["texto"] = texto
-        auto = gen.extraer_datos_inteligente(texto)
-        st.session_state.datos_extraidos["rit"] = auto["rit"]
-        st.session_state.datos_extraidos["ruc"] = auto["ruc"]
-        st.session_state.datos_extraidos["tribunal"] = auto["tribunal"]
-        st.success("✅ Datos sugeridos extraídos del PDF")
+        # 3. Condenas Adulto (Con lectura Inteligente)
+        st.subheader("3. Fundamento: Condenas Adulto")
+        pdf_adulto = st.file_uploader("Adjuntar sentencia adulto para relleno rápido", type="pdf", accept_multiple_files=True)
+        
+        if "condenas_adulto" not in st.session_state: st.session_state.condenas_adulto = []
 
-st.markdown("---")
+        if pdf_adulto:
+            for file in pdf_adulto:
+                if file.name not in [c.get('filename') for c in st.session_state.condenas_adulto]:
+                    datos = gp.extraer_datos_pdf(file)
+                    st.session_state.condenas_adulto.append({
+                        "rit": datos["rit"], "ruc": datos["ruc"], "juzgado": datos["tribunal"], "pena": "", "filename": file.name, "bytes": file.getvalue()
+                    })
 
-# 2. Formulario Principal (Sin pestañas)
-col1, col2 = st.columns(2)
+        for i, cond in enumerate(st.session_state.condenas_adulto):
+            cols = st.columns([2, 2, 2, 3, 1])
+            cond["rit"] = cols[0].text_input(f"RIT Adulto", cond["rit"], key=f"rit_ad_{i}")
+            cond["ruc"] = cols[1].text_input(f"RUC Adulto", cond["ruc"], key=f"ruc_ad_{i}")
+            cond["juzgado"] = cols[2].text_input(f"Juzgado Adulto", cond["juzgado"], key=f"juz_ad_{i}")
+            cond["pena"] = cols[3].text_input(f"Pena Adulto", cond["pena"], key=f"pen_ad_{i}")
+            if cols[4].button("🗑️", key=f"del_ad_{i}"):
+                st.session_state.condenas_adulto.pop(i)
+                st.rerun()
 
-with col1:
-    nombre_post = st.text_input("Postulante", "IGNACIO BADILLA LARA")
-    imputado = st.text_input("Nombre Imputado", placeholder="Ej: JUAN PEREZ")
-    rit = st.text_input("RIT Causa RPA", value=st.session_state.datos_extraidos["rit"])
-    ruc = st.text_input("RUC Causa RPA", value=st.session_state.datos_extraidos["ruc"])
-
-with col2:
-    tribunal = st.text_input("Juzgado de Garantía", value=st.session_state.datos_extraidos["tribunal"])
-    comuna_rpa = st.text_input("Comuna Sentencia RPA", placeholder="Ej: San Bernardo")
-    pena_rpa = st.text_input("Pena RPA impuesta", placeholder="Ej: 2 años de libertad asistida")
-
-st.markdown("---")
-
-# 3. Acciones Finales
-if st.session_state.datos_extraidos["texto"]:
-    with st.expander("🔍 Revisar Texto del PDF que se incluirá"):
-        st.text_area("Transcripción:", st.session_state.datos_extraidos["texto"], height=200)
-
-    if st.button("🚀 GENERAR ESCRITO COMPLETO", use_container_width=True):
-        if not imputado or not rit:
-            st.warning("⚠️ Completa el nombre del imputado y el RIT antes de continuar.")
-        else:
-            gen = GeneradorJuridico()
-            datos_finales = {
-                "nombre": nombre_post, "imputado": imputado, "rit_rpa": rit,
-                "ruc_rpa": ruc, "tribunal": tribunal, "comuna_rpa": comuna_rpa,
-                "pena_rpa": pena_rpa
+        # 4. Generación Final
+        if st.button("🚀 GENERAR ESCRITO Y UNIR DOCUMENTOS"):
+            data_final = {
+                "individualizacion": {"defensor": defensor, "adolescente": adolescente, "juzgado": juzgado_e, "rit": rit_e, "ruc": ruc_e},
+                "causas_rpa": st.session_state.causas_rpa,
+                "condenas_adulto": st.session_state.condenas_adulto
             }
-            docx = gen.crear_escrito(datos_finales, st.session_state.datos_extraidos["texto"])
             
-            st.download_button(
-                label="⬇️ DESCARGAR DOCUMENTO WORD",
-                data=docx,
-                file_name=f"Extincion_{imputado.replace(' ', '_')}.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                use_container_width=True
-            )
+            # Generar Word
+            docx_buffer = gp.crear_docx(data_final)
+            
+            # Unir con PDFs (Merge)
+            pdf_final = fitz.open()
+            # Nota: Para unir Word se requiere conversión o adjuntar solo los PDFs de adultos
+            for cond in st.session_state.condenas_adulto:
+                if "bytes" in cond:
+                    pdf_ad = fitz.open(stream=cond["bytes"], filetype="pdf")
+                    pdf_final.insert_pdf(pdf_ad)
+            
+            # Descarga
+            st.session_state.historial.append({"fecha": "Hoy", "adolescente": adolescente, "rit": rit_e})
+            st.success("Escrito preparado.")
+            st.download_button("⬇️ Descargar Word del Escrito", docx_buffer, f"Extincion_{adolescente}.docx")
+            
+            if len(st.session_state.condenas_adulto) > 0:
+                out_pdf = io.BytesIO(pdf_final.tobytes())
+                st.download_button("⬇️ Descargar PDFs de Adulto Consolidados", out_pdf, "Sentencias_Adjuntas.pdf")
+
+    elif menu == "Historial":
+        st.subheader("Historial de Escritos Generados")
+        if st.session_state.historial:
+            st.table(st.session_state.historial)
+        else:
+            st.write("No hay registros en esta sesión.")
