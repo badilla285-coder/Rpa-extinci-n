@@ -1,7 +1,6 @@
 streamlit
-python-docx
 pymupdf
-selenium
+python-docxselenium
 webdriver-manager
 requests
 beautifulsoup4
