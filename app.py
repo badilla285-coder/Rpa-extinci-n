@@ -3,6 +3,7 @@ from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 import io
+import re
 from datetime import datetime, timedelta
 
 # --- SEGURIDAD Y ACCESO ---
@@ -22,12 +23,14 @@ def check_password():
     return True
 
 class GeneradorOficial:
-    def __init__(self):
+    def __init__(self, defensor, adolescente):
         self.fuente = "Cambria"
         self.tamano = 12
+        self.defensor = defensor
+        self.adolescente = adolescente
 
     def generar_docx(self, data):
-        """Genera el Word con formato Cambria 12, interlineado 1.5 y negritas estratégicas."""
+        """Genera el Word con formato Cambria 12, interlineado 1.5 y sangría en todos los párrafos."""
         doc = Document()
         for s in doc.sections:
             s.left_margin = Inches(1.2)
@@ -40,43 +43,42 @@ class GeneradorOficial:
             if indent: 
                 p.paragraph_format.first_line_indent = Inches(0.5)
             
-            # Lógica para negritas automáticas en RIT, RUC y Nombres
-            # Buscamos patrones de RIT/RUC y palabras en mayúsculas (Juzgados/Nombres)
-            partes = re.split(r'(\d+-\d{4}|\d{7,10}-[\dkK]|JUZGADO DE GARANTÍA DE [A-ZÁÉÍÓÚÑ\s]+|[A-ZÁÉÍÓÚÑ]{3,}(?:\s[A-ZÁÉÍÓÚÑ]{3,})+)', texto_base)
+            # Patrón para negritas: RIT, RUC, Juzgados, Nombre Defensor y Nombre Adolescente
+            # Escapamos los nombres para el regex por si tienen caracteres especiales
+            def_esc = re.escape(self.defensor.upper())
+            ado_esc = re.escape(self.adolescente.upper())
+            
+            patron = f"(RIT|RUC|{def_esc}|{ado_esc}|JUZGADO DE GARANTÍA DE [A-ZÁÉÍÓÚÑ\s]+|\d+-\d{{4}}|\d{{7,10}}-[\dkK])"
+            partes = re.split(patron, texto_base, flags=re.IGNORECASE)
             
             for fragmento in partes:
+                if not fragmento: continue
                 run = p.add_run(fragmento)
                 run.font.name = self.fuente
                 run.font.size = Pt(self.tamano)
-                # Si el fragmento coincide con datos clave o se pide negrita total
-                if bold_all or re.match(r'(\d+-\d{4}|\d{7,10}-[\dkK]|JUZGADO DE GARANTÍA DE [A-ZÁÉÍÓÚÑ\s]+)', fragmento):
+                
+                # Aplicar negrita si es un dato clave o se solicita para todo el párrafo
+                if bold_all or re.match(patron, fragmento, re.IGNORECASE):
                     run.bold = True
             return p
 
-        # 1. ENCABEZADO
-        header = doc.add_paragraph()
-        run_h1 = header.add_run("DEFENSORÍA PENAL PÚBLICA\n")
-        run_h1.bold = True
-        run_h1.font.size = Pt(10)
-        run_h2 = header.add_run("Sin defensa no hay Justicia")
-        run_h2.italic = True
-        run_h2.font.size = Pt(9)
-
-        # 2. SUMA
+        # 1. SUMA (Sin encabezado/logo previo)
         suma = doc.add_paragraph()
-        r_suma = suma.add_run("\nEN LO PRINCIPAL: SOLICITA EXTINCIÓN;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
+        suma.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r_suma = suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
         r_suma.bold = True
         r_suma.font.name, r_suma.font.size = self.fuente, Pt(self.tamano)
 
-        # 3. TRIBUNAL Y COMPARECENCIA
+        # 2. TRIBUNAL
         add_p(f"\nJUZGADO DE GARANTÍA DE {data['juzgado_ejecucion'].upper()}", bold_all=True, indent=False)
         
-        comp = (f"\n{data['defensor'].upper()}, Abogada, Defensora Penal Pública, en representación de "
-                f"{data['adolescente'].upper()}, en causa RIT: {data['rit_principal']}, "
+        # 3. COMPARECENCIA (Ahora con sangría)
+        comp = (f"\n{self.defensor.upper()}, Abogada, Defensora Penal Pública, en representación de "
+                f"{self.adolescente.upper()}, en causa RIT: {data['rit_principal']}, "
                 f"RUC: {data['ruc_principal']}, a S.S., respetuosamente digo:")
-        add_p(comp, indent=False)
+        add_p(comp, indent=True)
 
-        # 4. CUERPO LEGAL
+        # 4. CUERPO LEGAL (Con sangría)
         add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de "
                 "Responsabilidad Penal Adolescente, o en subsidio se fije día y hora para celebrar "
                 "audiencia para debatir sobre la extinción de la pena respecto de mi representado, en "
@@ -87,16 +89,21 @@ class GeneradorOficial:
             add_p(f"{i}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el JUZGADO DE GARANTÍA DE "
                   f"{c['juzgado'].upper()} a la pena de {c['sancion']}.")
 
-        add_p("El fundamento radica en una condena de mayor gravedad como adulto:")
+        add_p("El fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
         for i, c in enumerate(data['causas_adulto'], 1):
             idx = i + len(data['causas_rpa'])
             add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el JUZGADO DE GARANTÍA DE {c['juzgado'].upper()}, "
                   f"con fecha {c['fecha']}, a la pena de {c['pena']}.")
 
-        # 5. CIERRE
+        # 5. FUNDAMENTO TÉCNICO
+        add_p("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave el delito o conjunto de ellos "
+              "que tuviere asignada en la ley una mayor pena de conformidad con las reglas generales.")
+
+        # 6. PETITORIA
         add_p("\nPOR TANTO,", indent=False)
         add_p("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
 
+        # 7. OTROSÍ
         add_p("\nOTROSÍ: Acompaña sentencia de adulto.", bold_all=True, indent=False)
         add_p("POR TANTO, SOLICITO A S.S. se tenga por acompañada.", indent=False)
 
@@ -105,9 +112,7 @@ class GeneradorOficial:
         buf.seek(0)
         return buf
 
-import re # Necesario para las negritas automáticas
-
-# --- INTERFAZ ---
+# --- INTERFAZ STREAMLIT ---
 if check_password():
     st.set_page_config(page_title="Generador Judicial Nacho", layout="wide")
     
@@ -124,6 +129,8 @@ if check_password():
             dias = {"Amparo": 1, "Apelación (General)": 5, "Apelación (Sent. Definitiva)": 10, "Reposición": 3}
             venc = fecha_not + timedelta(days=dias[tipo_res])
             st.error(f"Vencimiento: {venc.strftime('%d-%m-%Y')}")
+        st.markdown("---")
+        st.button("🧹 Reiniciar Caso", on_click=lambda: st.session_state.update({"rpa_list":[], "adulto_list":[]}))
 
     st.title("⚖️ Generador de Escritos de Extinción")
 
@@ -133,8 +140,10 @@ if check_password():
     def_nom = c1.text_input("Defensor/a", "IGNACIO BADILLA LARA")
     imp_nom = c2.text_input("Nombre Adolescente")
     juz_ej = c3.text_input("Juzgado Ejecución")
-    rit_pr = st.text_input("RIT Principal")
-    ruc_pr = st.text_input("RUC Principal")
+    
+    c4, c5 = st.columns(2)
+    rit_pr = c4.text_input("RIT Principal")
+    ruc_pr = c5.text_input("RUC Principal")
 
     # 2. CAUSAS RPA
     st.header("2. Causas RPA")
@@ -163,5 +172,17 @@ if check_password():
 
     # 4. GENERACIÓN
     if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
-        datos = {"defensor": def_nom, "adolescente": imp_nom, "juzgado_ejecucion": juz_ej, "rit_principal": rit_pr, "ruc_principal": ruc_pr, "causas_rpa": st.session_state.rpa_list, "causas_adulto": st.session_state.adulto_list}
-        st.download_button("⬇️ Descargar", GeneradorOficial().generar_docx(datos), f"Extincion_{imp_nom}.docx", use_container_width=True)
+        if not imp_nom or not rit_pr:
+            st.error("⚠️ Faltan datos obligatorios (Adolescente y RIT principal).")
+        else:
+            datos = {
+                "defensor": def_nom, 
+                "adolescente": imp_nom, 
+                "juzgado_ejecucion": juz_ej, 
+                "rit_principal": rit_pr, 
+                "ruc_principal": ruc_pr, 
+                "causas_rpa": st.session_state.rpa_list, 
+                "causas_adulto": st.session_state.adulto_list
+            }
+            gen = GeneradorOficial(def_nom, imp_nom)
+            st.download_button("⬇️ Descargar", gen.generar_docx(datos), f"Extincion_{imp_nom}.docx", use_container_width=True)
