@@ -123,14 +123,13 @@ class GeneradorOficial:
         add_p("\nPOR TANTO,", indent=False)
         add_p("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
 
-        # 7. OTROSÍ DINÁMICO
-        rits_adulto = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_adulto'] if c['rit']])
-        add_p(f"\nOTROSÍ: Acompaña sentencias de adulto de mi representado de las causas {rits_adulto}.", bold_all=True, indent=False)
+        # 7. OTROSÍ DINÁMICO (Modificado según requerimiento)
+        otrosi_list = [f"RIT: {c['rit']}, RUC: {c['ruc']}" for c in data['causas_adulto'] if c['rit']]
+        otrosi_texto = "Se acompaña sentencia de adulto en causa " + " y ".join(otrosi_list)
+        add_p(f"\nOTROSÍ: {otrosi_texto}.", bold_all=True, indent=False)
         add_p("POR TANTO, SOLICITO A S.S. se tengan por acompañadas.", indent=False)
 
-        buf = io.BytesIO()
-        doc.save(buf)
-        buf.seek(0)
+        buf = io.BytesIO(); doc.save(buf); buf.seek(0)
         return buf
 
 # --- INTERFAZ STREAMLIT ---
@@ -142,27 +141,13 @@ if check_password():
 
     # SIDEBAR
     with st.sidebar:
-        hora_cl = (datetime.utcnow() - timedelta(hours=3)).strftime('%H:%M:%S')
-        st.markdown(f"🕒 **Chile: {hora_cl}**")
         st.header("👤 Perfil")
         st.write(f"Usuario: **{st.session_state.user_name}**")
         st.write(f"LegalCoins: **{st.session_state.legal_coins}** 🪙")
         st.progress(min(st.session_state.legal_coins / 500, 1.0))
-        if st.session_state.legal_coins >= 500:
-            st.success("🎉 ¡Meta para café alcanzada!")
 
         st.markdown("---")
-        st.header("📂 Unir PDFs")
-        pdfs = st.file_uploader("Subir documentos", accept_multiple_files=True, type="pdf")
-        if st.button("Unir Documentos"):
-            if pdfs:
-                merger = PyPDF2.PdfMerger()
-                for p in pdfs: merger.append(p)
-                out = io.BytesIO(); merger.write(out)
-                st.download_button("⬇️ Descargar PDF", out.getvalue(), "Unido.pdf")
-        
-        st.markdown("---")
-        st.header("⏳ Calculadora")
+        st.header("⏳ Calculadora de Plazos")
         tipo_res = st.selectbox("Resolución", ["Amparo", "Apelación (5d)", "Apelación (10d)"])
         fecha_not = st.date_input("Fecha Notificación")
         if st.button("Calcular"):
@@ -170,69 +155,100 @@ if check_password():
             venc = fecha_not + timedelta(days=d_map[tipo_res])
             st.error(f"Vencimiento: {venc.strftime('%d-%m-%Y')}")
 
-    st.title("⚖️ Generador de Escritos")
+        st.markdown("---")
+        st.header("📂 Unir Documentos Externos")
+        pdfs_merge = st.file_uploader("Adjuntar PDFs a unir", accept_multiple_files=True, type="pdf", key="sidebar_pdf")
+        if st.button("Unir Documentos"):
+            if pdfs_merge:
+                merger = PyPDF2.PdfMerger()
+                for p in pdfs_merge: merger.append(p)
+                out = io.BytesIO(); merger.write(out)
+                st.download_button("⬇️ Descargar PDF Unido", out.getvalue(), "Unido.pdf")
 
-    # 1. INDIVIDUALIZACIÓN
-    st.header("1. Individualización")
-    c1, c2, c3 = st.columns(3)
-    def_nom = c1.text_input("Defensor/a", st.session_state.user_name)
-    imp_nom = c2.text_input("Nombre Adolescente")
-    juz_ej_sel = c3.selectbox("Juzgado Ejecución", ["Seleccionar..."] + TRIBUNALES_STGO_SM)
-    juz_ej = juz_ej_sel if juz_ej_sel != "Seleccionar..." else ""
+    # CUERPO PRINCIPAL
+    tab1, tab2 = st.tabs(["📝 Generador de Escritos", "⚙️ Administración de Perfiles"])
 
-    st.subheader("Causas en conocimiento del Tribunal")
-    for i, item in enumerate(st.session_state.ej_list):
-        cols_ej = st.columns([4, 4, 1])
-        item['rit'] = cols_ej[0].text_input(f"RIT {i+1}", item['rit'], key=f"ej_rit_{i}")
-        item['ruc'] = cols_ej[1].text_input(f"RUC {i+1}", item['ruc'], key=f"ej_ruc_{i}")
-        if item['ruc'] and not validar_ruc_chileno(item['ruc']):
-            st.caption("⚠️ RUC inválido")
-        if cols_ej[2].button("❌", key=f"del_ej_{i}"):
-            st.session_state.ej_list.pop(i); st.rerun()
+    with tab1:
+        st.header("1. Individualización")
+        c1, c2, c3 = st.columns(3)
+        def_nom = c1.text_input("Defensor/a", st.session_state.user_name)
+        imp_nom = c2.text_input("Nombre Adolescente")
+        juz_ej_sel = c3.selectbox("Juzgado Ejecución", ["Seleccionar..."] + TRIBUNALES_STGO_SM)
+        juz_ej = juz_ej_sel if juz_ej_sel != "Seleccionar..." else ""
+
+        st.subheader("Causas en conocimiento del Tribunal")
+        for i, item in enumerate(st.session_state.ej_list):
+            cols_ej = st.columns([4, 4, 1])
+            item['rit'] = cols_ej[0].text_input(f"RIT {i+1}", item['rit'], key=f"ej_rit_{i}")
+            item['ruc'] = cols_ej[1].text_input(f"RUC {i+1}", item['ruc'], key=f"ej_ruc_{i}")
+            # PUNTO 5: Validador RUC
+            if item['ruc'] and not validar_ruc_chileno(item['ruc']):
+                st.caption("⚠️ Formato RUC incorrecto (ej: 12345678-K)")
+            if cols_ej[2].button("❌", key=f"del_ej_{i}"):
+                st.session_state.ej_list.pop(i); st.rerun()
     
-    if st.button("➕ Añadir Ruc y Rit"):
-        st.session_state.ej_list.append({"rit":"", "ruc":""}); st.rerun()
+        # PUNTO 4: Nombre de botón corregido
+        if st.button("➕ Añadir Ruc y Rit"):
+            st.session_state.ej_list.append({"rit":"", "ruc":""}); st.rerun()
 
-    # 2. CAUSAS RPA
-    st.header("2. Causas RPA")
-    for i, item in enumerate(st.session_state.rpa_list):
-        cols = st.columns([2, 2, 3, 3, 0.5])
-        item['rit'] = cols[0].text_input("RIT RPA", item['rit'], key=f"r_rit_{i}")
-        item['ruc'] = cols[1].text_input("RUC RPA", item['ruc'], key=f"r_ruc_{i}")
-        item['juzgado'] = cols[2].selectbox("Juzgado RPA", TRIBUNALES_STGO_SM, key=f"r_juz_{i}")
-        item['sancion'] = cols[3].text_input("Sanción", item['sancion'], key=f"r_san_{i}")
-        if cols[4].button("❌", key=f"del_rpa_{i}"): 
-            st.session_state.rpa_list.pop(i); st.rerun()
-    if st.button("➕ Agregar Causa RPA"): st.session_state.rpa_list.append({"rit":"", "ruc":"", "juzgado":"", "sancion":""}); st.rerun()
+        st.header("2. Causas RPA")
+        for i, item in enumerate(st.session_state.rpa_list):
+            cols = st.columns([2, 2, 3, 3, 0.5])
+            item['rit'] = cols[0].text_input("RIT RPA", item['rit'], key=f"r_rit_{i}")
+            item['ruc'] = cols[1].text_input("RUC RPA", item['ruc'], key=f"r_ruc_{i}")
+            item['juzgado'] = cols[2].selectbox("Juzgado RPA", TRIBUNALES_STGO_SM, key=f"r_juz_{i}")
+            item['sancion'] = cols[3].text_input("Sanción", item['sancion'], key=f"r_san_{i}")
+            if cols[4].button("❌", key=f"del_rpa_{i}"): 
+                st.session_state.rpa_list.pop(i); st.rerun()
+        if st.button("➕ Agregar Causa RPA"): st.session_state.rpa_list.append({"rit":"", "ruc":"", "juzgado":"", "sancion":""}); st.rerun()
 
-    # 3. CONDENAS ADULTO
-    st.header("3. Condenas Adulto")
-    for i, item in enumerate(st.session_state.adulto_list):
-        cols = st.columns([2, 2, 2, 2, 2, 0.5])
-        item['rit'] = cols[0].text_input("RIT Ad", item['rit'], key=f"a_rit_{i}")
-        item['ruc'] = cols[1].text_input("RUC Ad", item['ruc'], key=f"a_ruc_{i}")
-        item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, key=f"a_juz_{i}")
-        item['pena'] = cols[3].text_input("Pena", item['pena'], key=f"a_pen_{i}")
-        item['fecha'] = cols[4].text_input("Fecha", item['fecha'], key=f"a_fec_{i}")
-        if cols[5].button("❌", key=f"del_ad_{i}"): 
-            st.session_state.adulto_list.pop(i); st.rerun()
-    if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
+        st.header("3. Condenas Adulto")
+        for i, item in enumerate(st.session_state.adulto_list):
+            cols = st.columns([2, 2, 2, 2, 2, 0.5])
+            item['rit'] = cols[0].text_input("RIT Ad", item['rit'], key=f"a_rit_{i}")
+            item['ruc'] = cols[1].text_input("RUC Ad", item['ruc'], key=f"a_ruc_{i}")
+            item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, key=f"a_juz_{i}")
+            item['pena'] = cols[3].text_input("Pena", item['pena'], key=f"a_pen_{i}")
+            item['fecha'] = cols[4].text_input("Fecha", item['fecha'], key=f"a_fec_{i}")
+            if cols[5].button("❌", key=f"del_ad_{i}"): 
+                st.session_state.adulto_list.pop(i); st.rerun()
+        if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
 
-    # 4. GENERACIÓN
-    if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
-        if not imp_nom or not st.session_state.ej_list[0]['rit']:
-            st.error("⚠️ Datos faltantes.")
-        else:
-            st.session_state.legal_coins += 25
-            st.session_state.stats_count += 1
-            datos_finales = {
-                "defensor": def_nom, 
-                "adolescente": imp_nom, 
-                "juzgado_ejecucion": juz_ej, 
-                "causas_ej_principales": st.session_state.ej_list,
-                "causas_rpa": st.session_state.rpa_list, 
-                "causas_adulto": st.session_state.adulto_list
-            }
-            gen = GeneradorOficial(def_nom, imp_nom)
-            st.download_button("⬇️ Descargar Word", gen.generar_docx(datos_finales), f"Extincion_{imp_nom}.docx", use_container_width=True)
-            st.balloons()
+        # PUNTO 2: Horneado (Unión de archivos)
+        st.markdown("---")
+        st.header("🔥 Horneado (Unir Word con Sentencias PDF)")
+        sentencias_horneado = st.file_uploader("Adjuntar Sentencias (PDF) para unir al proceso", accept_multiple_files=True, type="pdf", key="horneado")
+
+        if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
+            if not imp_nom or not st.session_state.ej_list[0]['rit']:
+                st.error("⚠️ Datos faltantes.")
+            else:
+                st.session_state.legal_coins += 25
+                st.session_state.stats_count += 1
+                datos = {
+                    "defensor": def_nom, "adolescente": imp_nom, "juzgado_ejecucion": juz_ej, 
+                    "causas_ej_principales": st.session_state.ej_list,
+                    "causas_rpa": st.session_state.rpa_list, "causas_adulto": st.session_state.adulto_list
+                }
+                gen = GeneradorOficial(def_nom, imp_nom)
+                word_buf = gen.generar_docx(datos)
+                
+                # Descarga del Word
+                st.download_button("⬇️ Descargar Escrito (Word)", word_buf, f"Extincion_{imp_nom}.docx")
+                
+                # Si hay sentencias, ofrecer unión
+                if sentencias_horneado:
+                    merger_h = PyPDF2.PdfMerger()
+                    for s in sentencias_horneado: merger_h.append(s)
+                    out_h = io.BytesIO(); merger_h.write(out_h)
+                    st.download_button("⬇️ Descargar Sentencias Unidas (PDF)", out_h.getvalue(), f"Sentencias_{imp_nom}.pdf")
+                st.balloons()
+
+    with tab2:
+        st.header("⚙️ Administración de Perfiles")
+        if st.session_state.is_admin:
+            df_users = pd.DataFrame.from_dict(USUARIOS_REGISTRADOS, orient='index')
+            st.table(df_users[['nombre', 'nivel']])
+        else: st.warning("Solo administradores.")
+
+    st.caption(f"Aplicación hecha por Ignacio Badilla Lara | {datetime.now().year}")
