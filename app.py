@@ -23,19 +23,24 @@ TRIBUNALES_STGO_SM = [
     "Juzgado de Garantía de Curacaví", "Juzgado de Garantía de Colina"
 ]
 
-# --- GESTIÓN DE USUARIOS INICIAL ---
+# --- GESTIÓN DE ESTADO Y USUARIOS ---
 if "usuarios_db" not in st.session_state:
     st.session_state.usuarios_db = {
         "badilla285@gmail.com": {"nombre": "IGNACIO BADILLA LARA", "pw": "RPA2026", "nivel": "Admin"},
         "colega1@pjud.cl": {"nombre": "DEFENSOR ASOCIADO 1", "pw": "LEGAL2026", "nivel": "Usuario"},
     }
 
-# --- FUNCIONES DE APOYO ---
-def validar_ruc_chileno(ruc):
-    if not ruc: return True
-    patron = r"^\d{7,9}-[\dkK]$"
-    return bool(re.match(patron, ruc))
+# Inicialización de variables de formulario para persistencia entre pestañas/sesiones
+if "form_data" not in st.session_state:
+    st.session_state.form_data = {
+        "imp_nom": "",
+        "juz_ej_sel": "Seleccionar...",
+        "rpa_list": [],
+        "adulto_list": [],
+        "ej_list": [{"rit":"", "ruc":""}]
+    }
 
+# --- FUNCIONES DE APOYO ---
 def check_password():
     if "auth_user" not in st.session_state:
         st.title("🔐 Acceso a Generador de Escritos")
@@ -118,9 +123,6 @@ class GeneradorOficial:
 # --- INTERFAZ STREAMLIT ---
 if check_password():
     st.set_page_config(page_title="Generador Judicial IBL", layout="wide")
-    if "rpa_list" not in st.session_state: st.session_state.rpa_list = []
-    if "adulto_list" not in st.session_state: st.session_state.adulto_list = []
-    if "ej_list" not in st.session_state: st.session_state.ej_list = [{"rit":"", "ruc":""}]
 
     with st.sidebar:
         st.header("👤 Perfil")
@@ -152,45 +154,50 @@ if check_password():
         st.header("1. Individualización")
         c1, c2, c3 = st.columns(3)
         def_nom = c1.text_input("Defensor/a", st.session_state.user_name)
-        imp_nom = c2.text_input("Nombre Adolescente")
-        juz_ej_sel = c3.selectbox("Juzgado Ejecución", ["Seleccionar..."] + TRIBUNALES_STGO_SM)
-        juz_ej = juz_ej_sel if juz_ej_sel != "Seleccionar..." else ""
+        # Sincronización con session_state para persistencia
+        st.session_state.form_data["imp_nom"] = c2.text_input("Nombre Adolescente", value=st.session_state.form_data["imp_nom"])
+        st.session_state.form_data["juz_ej_sel"] = c3.selectbox("Juzgado Ejecución", ["Seleccionar..."] + TRIBUNALES_STGO_SM, index=(["Seleccionar..."] + TRIBUNALES_STGO_SM).index(st.session_state.form_data["juz_ej_sel"]))
+        
+        imp_nom = st.session_state.form_data["imp_nom"]
+        juz_ej = st.session_state.form_data["juz_ej_sel"] if st.session_state.form_data["juz_ej_sel"] != "Seleccionar..." else ""
 
         st.subheader("Causas en conocimiento del Tribunal")
-        for i, item in enumerate(st.session_state.ej_list):
+        for i, item in enumerate(st.session_state.form_data["ej_list"]):
             cols_ej = st.columns([4, 4, 1])
             item['rit'] = cols_ej[0].text_input(f"RIT {i+1}", item['rit'], key=f"ej_rit_{i}")
             item['ruc'] = cols_ej[1].text_input(f"RUC {i+1}", item['ruc'], key=f"ej_ruc_{i}")
-            if item['ruc'] and not validar_ruc_chileno(item['ruc']):
-                st.caption("⚠️ Formato RUC incorrecto (12345678-K)")
+            # Validador de RUC eliminado según solicitud
             if cols_ej[2].button("❌", key=f"del_ej_{i}"):
-                st.session_state.ej_list.pop(i); st.rerun()
+                st.session_state.form_data["ej_list"].pop(i); st.rerun()
         
         if st.button("➕ Añadir Ruc y Rit"):
-            st.session_state.ej_list.append({"rit":"", "ruc":""}); st.rerun()
+            st.session_state.form_data["ej_list"].append({"rit":"", "ruc":""}); st.rerun()
 
         st.header("2. Causas RPA")
-        for i, item in enumerate(st.session_state.rpa_list):
+        for i, item in enumerate(st.session_state.form_data["rpa_list"]):
             cols = st.columns([2, 2, 3, 3, 0.5])
             item['rit'] = cols[0].text_input("RIT RPA", item['rit'], key=f"r_rit_{i}")
             item['ruc'] = cols[1].text_input("RUC RPA", item['ruc'], key=f"r_ruc_{i}")
-            item['juzgado'] = cols[2].selectbox("Juzgado RPA", TRIBUNALES_STGO_SM, key=f"r_juz_{i}")
+            # Persistencia del juzgado seleccionado
+            default_idx = TRIBUNALES_STGO_SM.index(item['juzgado']) if item['juzgado'] in TRIBUNALES_STGO_SM else 0
+            item['juzgado'] = cols[2].selectbox("Juzgado RPA", TRIBUNALES_STGO_SM, index=default_idx, key=f"r_juz_{i}")
             item['sancion'] = cols[3].text_input("Sanción", item['sancion'], key=f"r_san_{i}")
             if cols[4].button("❌", key=f"del_rpa_{i}"): 
-                st.session_state.rpa_list.pop(i); st.rerun()
-        if st.button("➕ Agregar Causa RPA"): st.session_state.rpa_list.append({"rit":"", "ruc":"", "juzgado":"", "sancion":""}); st.rerun()
+                st.session_state.form_data["rpa_list"].pop(i); st.rerun()
+        if st.button("➕ Agregar Causa RPA"): st.session_state.form_data["rpa_list"].append({"rit":"", "ruc":"", "juzgado":TRIBUNALES_STGO_SM[0], "sancion":""}); st.rerun()
 
         st.header("3. Condenas Adulto")
-        for i, item in enumerate(st.session_state.adulto_list):
+        for i, item in enumerate(st.session_state.form_data["adulto_list"]):
             cols = st.columns([2, 2, 2, 2, 2, 0.5])
             item['rit'] = cols[0].text_input("RIT Ad", item['rit'], key=f"a_rit_{i}")
             item['ruc'] = cols[1].text_input("RUC Ad", item['ruc'], key=f"a_ruc_{i}")
-            item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, key=f"a_juz_{i}")
+            default_idx_ad = TRIBUNALES_STGO_SM.index(item['juzgado']) if item['juzgado'] in TRIBUNALES_STGO_SM else 0
+            item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, index=default_idx_ad, key=f"a_juz_{i}")
             item['pena'] = cols[3].text_input("Pena", item['pena'], key=f"a_pen_{i}")
             item['fecha'] = cols[4].text_input("Fecha", item['fecha'], key=f"a_fec_{i}")
             if cols[5].button("❌", key=f"del_ad_{i}"): 
-                st.session_state.adulto_list.pop(i); st.rerun()
-        if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
+                st.session_state.form_data["adulto_list"].pop(i); st.rerun()
+        if st.button("➕ Agregar Condena Adulto"): st.session_state.form_data["adulto_list"].append({"rit":"", "ruc":"", "juzgado":TRIBUNALES_STGO_SM[0], "pena":"", "fecha":""}); st.rerun()
 
         st.markdown("---")
         st.header("📄 Documentación de Respaldo (Otrosí)")
@@ -198,73 +205,11 @@ if check_password():
         sentencias_respaldo = st.file_uploader("Adjuntar Sentencias (PDF)", accept_multiple_files=True, type="pdf", key="respaldo")
 
         if st.button("🚀 GENERAR ESCRITO Y ADJUNTAR SENTENCIAS", use_container_width=True):
-            if not imp_nom or not st.session_state.ej_list[0]['rit']:
+            if not imp_nom or not st.session_state.form_data["ej_list"][0]['rit']:
                 st.error("⚠️ Faltan datos críticos.")
             else:
                 st.session_state.legal_coins += 25
                 st.session_state.stats_count += 1
                 datos = {
                     "defensor": def_nom, "adolescente": imp_nom, "juzgado_ejecucion": juz_ej, 
-                    "causas_ej_principales": st.session_state.ej_list,
-                    "causas_rpa": st.session_state.rpa_list, "causas_adulto": st.session_state.adulto_list
-                }
-                gen = GeneradorOficial(def_nom, imp_nom)
-                word_buf = gen.generar_docx(datos)
-                st.download_button("⬇️ Descargar Escrito (Word)", word_buf, f"Extincion_{imp_nom}.docx")
-                
-                if sentencias_respaldo:
-                    merger_r = PyPDF2.PdfMerger()
-                    for s in sentencias_respaldo: merger_r.append(s)
-                    out_r = io.BytesIO(); merger_r.write(out_r)
-                    st.download_button("⬇️ Descargar Sentencias Consolidadas (PDF)", out_r.getvalue(), f"Sentencias_{imp_nom}.pdf")
-                st.balloons()
-
-    with tab2:
-        st.header("⚙️ Gestión de Usuarios")
-        if st.session_state.is_admin:
-            # Formulario de Registro
-            with st.expander("🆕 Registrar Nuevo Usuario", expanded=False):
-                with st.form("nuevo_usuario", clear_on_submit=True):
-                    c_mail, c_nom = st.columns(2)
-                    n_email = c_mail.text_input("Email")
-                    n_nombre = c_nom.text_input("Nombre Completo")
-                    c_pw, c_niv = st.columns(2)
-                    n_pw = c_pw.text_input("Contraseña", type="password")
-                    n_nivel = c_niv.selectbox("Nivel", ["Usuario", "Admin"])
-                    if st.form_submit_button("Registrar"):
-                        if n_email:
-                            st.session_state.usuarios_db[n_email] = {"nombre": n_nombre, "pw": n_pw, "nivel": n_nivel}
-                            st.success(f"Usuario {n_email} registrado.")
-                            st.rerun()
-
-            st.markdown("---")
-            st.subheader("📋 Usuarios Registrados")
-            
-            # Encabezado de la tabla
-            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 3, 2, 1])
-            h_col1.markdown("**Email**")
-            h_col2.markdown("**Nombre**")
-            h_col3.markdown("**Nivel**")
-            h_col4.markdown("**Acción**")
-            st.divider()
-
-            # Filas de la tabla
-            for email, info in list(st.session_state.usuarios_db.items()):
-                b_col1, b_col2, b_col3, b_col4 = st.columns([3, 3, 2, 1])
-                b_col1.write(email)
-                b_col2.write(info['nombre'])
-                b_col3.write(info['nivel'])
-                
-                # Impedir que el admin actual se elimine a sí mismo
-                if email != st.session_state.auth_user:
-                    if b_col4.button("🗑️", key=f"del_user_{email}"):
-                        del st.session_state.usuarios_db[email]
-                        st.rerun()
-                else:
-                    b_col4.markdown("🔒")
-        else:
-            st.warning("Solo administradores pueden gestionar accesos.")
-
-    st.markdown("---")
-    st.markdown("<div style='text-align: center; color: gray;'>Aplicación creada por <b>IGNACIO ANTONIO BADILLA LARA</b></div>", unsafe_allow_html=True)
-    st.caption(f"Generador Judicial IBL | {datetime.now().year}")
+                    "causas_ej_principales": st.session_state.form_data["ej_list"],
