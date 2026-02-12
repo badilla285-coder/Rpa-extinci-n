@@ -213,3 +213,59 @@ if check_password():
                 datos = {
                     "defensor": def_nom, "adolescente": imp_nom, "juzgado_ejecucion": juz_ej, 
                     "causas_ej_principales": st.session_state.form_data["ej_list"],
+                    "causas_rpa": st.session_state.form_data["rpa_list"], "causas_adulto": st.session_state.form_data["adulto_list"]
+                }
+                gen = GeneradorOficial(def_nom, imp_nom)
+                word_buf = gen.generar_docx(datos)
+                st.download_button("⬇️ Descargar Escrito (Word)", word_buf, f"Extincion_{imp_nom}.docx")
+                
+                if sentencias_respaldo:
+                    merger_r = PyPDF2.PdfMerger()
+                    for s in sentencias_respaldo: merger_r.append(s)
+                    out_r = io.BytesIO(); merger_r.write(out_r)
+                    st.download_button("⬇️ Descargar Sentencias Consolidadas (PDF)", out_r.getvalue(), f"Sentencias_{imp_nom}.pdf")
+                st.balloons()
+
+    with tab2:
+        st.header("⚙️ Gestión de Usuarios")
+        if st.session_state.is_admin:
+            with st.expander("🆕 Registrar Nuevo Usuario", expanded=False):
+                with st.form("nuevo_usuario", clear_on_submit=True):
+                    c_mail, c_nom = st.columns(2)
+                    n_email = c_mail.text_input("Email")
+                    n_nombre = c_nom.text_input("Nombre Completo")
+                    c_pw, c_niv = st.columns(2)
+                    n_pw = c_pw.text_input("Contraseña", type="password")
+                    n_nivel = c_niv.selectbox("Nivel", ["Usuario", "Admin"])
+                    if st.form_submit_button("Registrar"):
+                        if n_email:
+                            st.session_state.usuarios_db[n_email] = {"nombre": n_nombre, "pw": n_pw, "nivel": n_nivel}
+                            st.success(f"Usuario {n_email} registrado.")
+                            st.rerun()
+
+            st.markdown("---")
+            st.subheader("📋 Usuarios Registrados")
+            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 3, 2, 1])
+            h_col1.markdown("**Email**")
+            h_col2.markdown("**Nombre**")
+            h_col3.markdown("**Nivel**")
+            h_col4.markdown("**Acción**")
+            st.divider()
+
+            for email, info in list(st.session_state.usuarios_db.items()):
+                b_col1, b_col2, b_col3, b_col4 = st.columns([3, 3, 2, 1])
+                b_col1.write(email)
+                b_col2.write(info['nombre'])
+                b_col3.write(info['nivel'])
+                if email != st.session_state.auth_user:
+                    if b_col4.button("🗑️", key=f"del_user_{email}"):
+                        del st.session_state.usuarios_db[email]
+                        st.rerun()
+                else:
+                    b_col4.markdown("🔒")
+        else:
+            st.warning("Solo administradores pueden gestionar accesos.")
+
+    st.markdown("---")
+    st.markdown("<div style='text-align: center; color: gray;'>Aplicación creada por <b>IGNACIO ANTONIO BADILLA LARA</b></div>", unsafe_allow_html=True)
+    st.caption(f"Generador Judicial IBL | {datetime.now().year}")
