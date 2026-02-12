@@ -216,22 +216,4 @@ if check_password():
     st.header("3. Condenas Adulto")
     for i, item in enumerate(st.session_state.adulto_list):
         cols = st.columns([2, 2, 2, 2, 2, 0.5])
-        item['rit'] = cols[0].text_input("RIT Ad", item['rit'], key=f"a_rit_{i}")
-        item['ruc'] = cols[1].text_input("RUC Ad", item['ruc'], key=f"a_ruc_{i}")
-        item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, key=f"a_juz_{i}")
-        item['pena'] = cols[3].text_input("Pena", item['pena'], key=f"a_pen_{i}")
-        item['fecha'] = cols[4].text_input("Fecha", item['fecha'], key=f"a_fec_{i}")
-        if cols[5].button("❌", key=f"del_ad_{i}"): 
-            st.session_state.adulto_list.pop(i); st.rerun()
-    if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
-
-    # 4. GENERACIÓN
-    if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
-        if not imp_nom or not st.session_state.ej_list[0]['rit']:
-            st.error("⚠️ Datos faltantes.")
-        else:
-            st.session_state.legal_coins += 25
-            st.session_state.stats_count += 1
-            datos = {
-                "defensor": def_nom, "adolescente": imp_nom, "juzgado_ejecucion": juz_ej, 
-                "causas_ej_principales": st.session_
+        item
