@@ -23,12 +23,12 @@ TRIBUNALES_STGO_SM = [
     "Juzgado de Garantía de Curacaví", "Juzgado de Garantía de Colina"
 ]
 
-# --- BASE DE DATOS DE USUARIOS ---
-USUARIOS_REGISTRADOS = {
-    "badilla285@gmail.com": {"nombre": "IGNACIO BADILLA LARA", "pw": "RPA2026", "nivel": "Admin"},
-    "colega1@pjud.cl": {"nombre": "DEFENSOR ASOCIADO 1", "pw": "LEGAL2026", "nivel": "Usuario"},
-}
-USUARIOS_AUTORIZADOS = list(USUARIOS_REGISTRADOS.keys())
+# --- GESTIÓN DE USUARIOS INICIAL ---
+if "usuarios_db" not in st.session_state:
+    st.session_state.usuarios_db = {
+        "badilla285@gmail.com": {"nombre": "IGNACIO BADILLA LARA", "pw": "RPA2026", "nivel": "Admin"},
+        "colega1@pjud.cl": {"nombre": "DEFENSOR ASOCIADO 1", "pw": "LEGAL2026", "nivel": "Usuario"},
+    }
 
 # --- FUNCIONES DE APOYO ---
 def validar_ruc_chileno(ruc):
@@ -43,10 +43,10 @@ def check_password():
         email = c1.text_input("Correo electrónico")
         pw = c2.text_input("Contraseña", type="password")
         if st.button("Ingresar"):
-            if email in USUARIOS_AUTORIZADOS and USUARIOS_REGISTRADOS[email]["pw"] == pw:
+            if email in st.session_state.usuarios_db and st.session_state.usuarios_db[email]["pw"] == pw:
                 st.session_state["auth_user"] = email
-                st.session_state["user_name"] = USUARIOS_REGISTRADOS[email]["nombre"]
-                st.session_state["is_admin"] = (USUARIOS_REGISTRADOS[email]["nivel"] == "Admin")
+                st.session_state["user_name"] = st.session_state.usuarios_db[email]["nombre"]
+                st.session_state["is_admin"] = (st.session_state.usuarios_db[email]["nivel"] == "Admin")
                 if "legal_coins" not in st.session_state: st.session_state["legal_coins"] = 0
                 if "stats_count" not in st.session_state: st.session_state["stats_count"] = 0
                 st.rerun()
@@ -90,83 +90,66 @@ class GeneradorOficial:
                     run.bold = True
             return p
 
-        # 1. SUMA
         suma = doc.add_paragraph()
-        suma.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_suma = suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
         r_suma.bold = True
         r_suma.font.name, r_suma.font.size = self.fuente, Pt(self.tamano)
-
-        # 2. TRIBUNAL
         add_p(f"\n{self.limpiar_tribunal(data['juzgado_ejecucion'])}", bold_all=True, indent=False)
-        
-        # 3. COMPARECENCIA MULTICAUSAL
         causas_ej_str = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_ej_principales'] if c['rit']])
         comp = (f"\n{self.defensor.upper()}, Abogada, Defensora Penal Pública, en representación de "
                 f"{self.adolescente.upper()}, en causas de ejecución {causas_ej_str}, a S.S., respetuosamente digo:")
         add_p(comp, indent=True)
-
-        # 4. CUERPO LEGAL
         add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de Responsabilidad Penal Adolescente, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
-
-        add_p("Mi representado fue condenado en la siguiente causa de la Ley RPA:")
         for i, c in enumerate(data['causas_rpa'], 1):
             add_p(f"{i}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])} a la pena de {c['sancion']}.")
-
-        add_p("El fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
+        add_p("\nEl fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
         for i, c in enumerate(data['causas_adulto'], 1):
             idx = i + len(data['causas_rpa'])
             add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])}, con fecha {c['fecha']}, a la pena de {c['pena']}.")
-
-        add_p("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave el delito o conjunto de ellos que tuviere asignada en la ley una mayor pena.")
-
         add_p("\nPOR TANTO,", indent=False)
         add_p("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
-
-        # 7. OTROSÍ DINÁMICO (Modificado según requerimiento)
-        otrosi_list = [f"RIT: {c['rit']}, RUC: {c['ruc']}" for c in data['causas_adulto'] if c['rit']]
-        otrosi_texto = "Se acompaña sentencia de adulto en causa " + " y ".join(otrosi_list)
-        add_p(f"\nOTROSÍ: {otrosi_texto}.", bold_all=True, indent=False)
+        
+        rits_adulto = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_adulto'] if c['rit']])
+        add_p(f"\nOTROSÍ: Acompaña sentencias de adulto de mi representado de las causas {rits_adulto}.", bold_all=True, indent=False)
         add_p("POR TANTO, SOLICITO A S.S. se tengan por acompañadas.", indent=False)
-
         buf = io.BytesIO(); doc.save(buf); buf.seek(0)
         return buf
 
 # --- INTERFAZ STREAMLIT ---
 if check_password():
-    st.set_page_config(page_title="Generador Judicial Nacho", layout="wide")
+    st.set_page_config(page_title="Generador Judicial IBL", layout="wide")
     if "rpa_list" not in st.session_state: st.session_state.rpa_list = []
     if "adulto_list" not in st.session_state: st.session_state.adulto_list = []
     if "ej_list" not in st.session_state: st.session_state.ej_list = [{"rit":"", "ruc":""}]
 
-    # SIDEBAR
     with st.sidebar:
+        # Reloj Chile (Elegante)
+        hora_cl = (datetime.utcnow() - timedelta(hours=3)).strftime('%H:%M:%S')
+        st.markdown(f"🖋️ **Horario de Gestión:** {hora_cl}")
         st.header("👤 Perfil")
-        st.write(f"Usuario: **{st.session_state.user_name}**")
+        st.write(f"Defensor: **{st.session_state.user_name}**")
         st.write(f"LegalCoins: **{st.session_state.legal_coins}** 🪙")
         st.progress(min(st.session_state.legal_coins / 500, 1.0))
 
+        st.markdown("---")
+        st.header("📂 Unir Documentos")
+        pdfs = st.file_uploader("Adjuntar archivos a unir", accept_multiple_files=True, type="pdf", key="sidebar_pdf")
+        if st.button("Unir PDFs"):
+            if pdfs:
+                merger = PyPDF2.PdfMerger()
+                for p in pdfs: merger.append(p)
+                out = io.BytesIO(); merger.write(out)
+                st.download_button("⬇️ Descargar PDF Unido", out.getvalue(), "Causa_Unida.pdf")
+        
         st.markdown("---")
         st.header("⏳ Calculadora de Plazos")
         tipo_res = st.selectbox("Resolución", ["Amparo", "Apelación (5d)", "Apelación (10d)"])
         fecha_not = st.date_input("Fecha Notificación")
         if st.button("Calcular"):
             d_map = {"Amparo": 1, "Apelación (5d)": 5, "Apelación (10d)": 10}
-            venc = fecha_not + timedelta(days=d_map[tipo_res])
-            st.error(f"Vencimiento: {venc.strftime('%d-%m-%Y')}")
+            st.error(f"Vencimiento: {(fecha_not + timedelta(days=d_map[tipo_res])).strftime('%d-%m-%Y')}")
 
-        st.markdown("---")
-        st.header("📂 Unir Documentos Externos")
-        pdfs_merge = st.file_uploader("Adjuntar PDFs a unir", accept_multiple_files=True, type="pdf", key="sidebar_pdf")
-        if st.button("Unir Documentos"):
-            if pdfs_merge:
-                merger = PyPDF2.PdfMerger()
-                for p in pdfs_merge: merger.append(p)
-                out = io.BytesIO(); merger.write(out)
-                st.download_button("⬇️ Descargar PDF Unido", out.getvalue(), "Unido.pdf")
-
-    # CUERPO PRINCIPAL
-    tab1, tab2 = st.tabs(["📝 Generador de Escritos", "⚙️ Administración de Perfiles"])
+    tab1, tab2 = st.tabs(["📝 Generador de Escritos", "⚙️ Administración de Usuarios"])
 
     with tab1:
         st.header("1. Individualización")
@@ -181,13 +164,11 @@ if check_password():
             cols_ej = st.columns([4, 4, 1])
             item['rit'] = cols_ej[0].text_input(f"RIT {i+1}", item['rit'], key=f"ej_rit_{i}")
             item['ruc'] = cols_ej[1].text_input(f"RUC {i+1}", item['ruc'], key=f"ej_ruc_{i}")
-            # PUNTO 5: Validador RUC
             if item['ruc'] and not validar_ruc_chileno(item['ruc']):
-                st.caption("⚠️ Formato RUC incorrecto (ej: 12345678-K)")
+                st.caption("⚠️ Formato RUC incorrecto (12345678-K)")
             if cols_ej[2].button("❌", key=f"del_ej_{i}"):
                 st.session_state.ej_list.pop(i); st.rerun()
-    
-        # PUNTO 4: Nombre de botón corregido
+        
         if st.button("➕ Añadir Ruc y Rit"):
             st.session_state.ej_list.append({"rit":"", "ruc":""}); st.rerun()
 
@@ -214,14 +195,15 @@ if check_password():
                 st.session_state.adulto_list.pop(i); st.rerun()
         if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
 
-        # PUNTO 2: Horneado (Unión de archivos)
+        # PUNTO 1: Documentación Otrosí (Modificado para ser profesional)
         st.markdown("---")
-        st.header("🔥 Horneado (Unir Word con Sentencias PDF)")
-        sentencias_horneado = st.file_uploader("Adjuntar Sentencias (PDF) para unir al proceso", accept_multiple_files=True, type="pdf", key="horneado")
+        st.header("📄 Documentación de Respaldo (Otrosí)")
+        st.info("Adjunte las sentencias de adulto para generar un archivo consolidado.")
+        sentencias_respaldo = st.file_uploader("Adjuntar Sentencias (PDF)", accept_multiple_files=True, type="pdf", key="respaldo")
 
-        if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
+        if st.button("🚀 GENERAR ESCRITO Y ADJUNTAR SENTENCIAS", use_container_width=True):
             if not imp_nom or not st.session_state.ej_list[0]['rit']:
-                st.error("⚠️ Datos faltantes.")
+                st.error("⚠️ Faltan datos críticos.")
             else:
                 st.session_state.legal_coins += 25
                 st.session_state.stats_count += 1
@@ -232,23 +214,34 @@ if check_password():
                 }
                 gen = GeneradorOficial(def_nom, imp_nom)
                 word_buf = gen.generar_docx(datos)
-                
-                # Descarga del Word
                 st.download_button("⬇️ Descargar Escrito (Word)", word_buf, f"Extincion_{imp_nom}.docx")
                 
-                # Si hay sentencias, ofrecer unión
-                if sentencias_horneado:
-                    merger_h = PyPDF2.PdfMerger()
-                    for s in sentencias_horneado: merger_h.append(s)
-                    out_h = io.BytesIO(); merger_h.write(out_h)
-                    st.download_button("⬇️ Descargar Sentencias Unidas (PDF)", out_h.getvalue(), f"Sentencias_{imp_nom}.pdf")
+                if sentencias_respaldo:
+                    merger_r = PyPDF2.PdfMerger()
+                    for s in sentencias_respaldo: merger_r.append(s)
+                    out_r = io.BytesIO(); merger_r.write(out_r)
+                    st.download_button("⬇️ Descargar Sentencias Consolidadas (PDF)", out_r.getvalue(), f"Sentencias_{imp_nom}.pdf")
                 st.balloons()
 
     with tab2:
-        st.header("⚙️ Administración de Perfiles")
+        st.header("⚙️ Gestión de Usuarios")
         if st.session_state.is_admin:
-            df_users = pd.DataFrame.from_dict(USUARIOS_REGISTRADOS, orient='index')
+            # PUNTO 2: Formulario para agregar colegas
+            with st.form("nuevo_usuario"):
+                st.write("Añadir nuevo colega/cliente")
+                n_email = st.text_input("Email")
+                n_nombre = st.text_input("Nombre Completo")
+                n_pw = st.text_input("Contraseña")
+                n_nivel = st.selectbox("Nivel", ["Usuario", "Admin"])
+                if st.form_submit_button("Registrar"):
+                    st.session_state.usuarios_db[n_email] = {"nombre": n_nombre, "pw": n_pw, "nivel": n_nivel}
+                    st.success(f"Usuario {n_email} registrado.")
+            
+            st.markdown("---")
+            st.write("Usuarios Actuales")
+            df_users = pd.DataFrame.from_dict(st.session_state.usuarios_db, orient='index')
             st.table(df_users[['nombre', 'nivel']])
-        else: st.warning("Solo administradores.")
+        else:
+            st.warning("Solo administradores pueden gestionar accesos.")
 
-    st.caption(f"Aplicación hecha por Ignacio Badilla Lara | {datetime.now().year}")
+    st.caption(f"Generador Judicial IBL | {datetime.now().year}")
