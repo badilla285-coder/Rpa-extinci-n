@@ -28,7 +28,6 @@ USUARIOS_REGISTRADOS = {
     "badilla285@gmail.com": {"nombre": "IGNACIO BADILLA LARA", "pw": "RPA2026", "nivel": "Admin"},
     "colega1@pjud.cl": {"nombre": "DEFENSOR ASOCIADO 1", "pw": "LEGAL2026", "nivel": "Usuario"},
 }
-
 USUARIOS_AUTORIZADOS = list(USUARIOS_REGISTRADOS.keys())
 
 # --- FUNCIONES DE APOYO ---
@@ -108,10 +107,7 @@ class GeneradorOficial:
         add_p(comp, indent=True)
 
         # 4. CUERPO LEGAL
-        add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de "
-                "Responsabilidad Penal Adolescente, o en subsidio se fije día y hora para celebrar "
-                "audiencia para debatir sobre la extinción de la pena respecto de mi representado, en "
-                "virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
+        add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de Responsabilidad Penal Adolescente, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
 
         add_p("Mi representado fue condenado en la siguiente causa de la Ley RPA:")
         for i, c in enumerate(data['causas_rpa'], 1):
@@ -120,21 +116,21 @@ class GeneradorOficial:
         add_p("El fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
         for i, c in enumerate(data['causas_adulto'], 1):
             idx = i + len(data['causas_rpa'])
-            add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])}, "
-                  f"con fecha {c['fecha']}, a la pena de {c['pena']}.")
+            add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])}, con fecha {c['fecha']}, a la pena de {c['pena']}.")
 
-        add_p("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave el delito o conjunto de ellos "
-              "que tuviere asignada en la ley una mayor pena de conformidad con las reglas generales.")
+        add_p("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave el delito o conjunto de ellos que tuviere asignada en la ley una mayor pena.")
 
         add_p("\nPOR TANTO,", indent=False)
         add_p("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
 
-        # 7. OTROSÍ DINÁMICO (Multicausal)
+        # 7. OTROSÍ DINÁMICO
         rits_adulto = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_adulto'] if c['rit']])
         add_p(f"\nOTROSÍ: Acompaña sentencias de adulto de mi representado de las causas {rits_adulto}.", bold_all=True, indent=False)
         add_p("POR TANTO, SOLICITO A S.S. se tengan por acompañadas.", indent=False)
 
-        buf = io.BytesIO(); doc.save(buf); buf.seek(0)
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
         return buf
 
 # --- INTERFAZ STREAMLIT ---
@@ -146,17 +142,14 @@ if check_password():
 
     # SIDEBAR
     with st.sidebar:
-        # Reloj Chile (UTC-3)
         hora_cl = (datetime.utcnow() - timedelta(hours=3)).strftime('%H:%M:%S')
         st.markdown(f"🕒 **Chile: {hora_cl}**")
-        
         st.header("👤 Perfil")
         st.write(f"Usuario: **{st.session_state.user_name}**")
         st.write(f"LegalCoins: **{st.session_state.legal_coins}** 🪙")
         st.progress(min(st.session_state.legal_coins / 500, 1.0))
         if st.session_state.legal_coins >= 500:
-            st.success("🎉 ¡Meta alcanzada! Canjea tu café.")
-            if st.button("🎁 Canjear Recompensa"): st.info("Solicitud enviada.")
+            st.success("🎉 ¡Meta para café alcanzada!")
 
         st.markdown("---")
         st.header("📂 Unir PDFs")
@@ -166,10 +159,10 @@ if check_password():
                 merger = PyPDF2.PdfMerger()
                 for p in pdfs: merger.append(p)
                 out = io.BytesIO(); merger.write(out)
-                st.download_button("⬇️ Descargar PDF Unido", out.getvalue(), "Causa_Completa.pdf")
+                st.download_button("⬇️ Descargar PDF", out.getvalue(), "Unido.pdf")
         
         st.markdown("---")
-        st.header("⏳ Calculadora de Plazos")
+        st.header("⏳ Calculadora")
         tipo_res = st.selectbox("Resolución", ["Amparo", "Apelación (5d)", "Apelación (10d)"])
         fecha_not = st.date_input("Fecha Notificación")
         if st.button("Calcular"):
@@ -193,7 +186,7 @@ if check_password():
         item['rit'] = cols_ej[0].text_input(f"RIT {i+1}", item['rit'], key=f"ej_rit_{i}")
         item['ruc'] = cols_ej[1].text_input(f"RUC {i+1}", item['ruc'], key=f"ej_ruc_{i}")
         if item['ruc'] and not validar_ruc_chileno(item['ruc']):
-            st.caption("⚠️ Formato RUC incorrecto")
+            st.caption("⚠️ RUC inválido")
         if cols_ej[2].button("❌", key=f"del_ej_{i}"):
             st.session_state.ej_list.pop(i); st.rerun()
     
@@ -216,4 +209,30 @@ if check_password():
     st.header("3. Condenas Adulto")
     for i, item in enumerate(st.session_state.adulto_list):
         cols = st.columns([2, 2, 2, 2, 2, 0.5])
-        item
+        item['rit'] = cols[0].text_input("RIT Ad", item['rit'], key=f"a_rit_{i}")
+        item['ruc'] = cols[1].text_input("RUC Ad", item['ruc'], key=f"a_ruc_{i}")
+        item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, key=f"a_juz_{i}")
+        item['pena'] = cols[3].text_input("Pena", item['pena'], key=f"a_pen_{i}")
+        item['fecha'] = cols[4].text_input("Fecha", item['fecha'], key=f"a_fec_{i}")
+        if cols[5].button("❌", key=f"del_ad_{i}"): 
+            st.session_state.adulto_list.pop(i); st.rerun()
+    if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
+
+    # 4. GENERACIÓN
+    if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
+        if not imp_nom or not st.session_state.ej_list[0]['rit']:
+            st.error("⚠️ Datos faltantes.")
+        else:
+            st.session_state.legal_coins += 25
+            st.session_state.stats_count += 1
+            datos_finales = {
+                "defensor": def_nom, 
+                "adolescente": imp_nom, 
+                "juzgado_ejecucion": juz_ej, 
+                "causas_ej_principales": st.session_state.ej_list,
+                "causas_rpa": st.session_state.rpa_list, 
+                "causas_adulto": st.session_state.adulto_list
+            }
+            gen = GeneradorOficial(def_nom, imp_nom)
+            st.download_button("⬇️ Descargar Word", gen.generar_docx(datos_finales), f"Extincion_{imp_nom}.docx", use_container_width=True)
+            st.balloons()
