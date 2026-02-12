@@ -22,18 +22,21 @@ TRIBUNALES_STGO_SM = [
     "Juzgado de Garantía de Curacaví", "Juzgado de Garantía de Colina"
 ]
 
-# --- SEGURIDAD ---
+# --- SEGURIDAD Y ACCESO ---
 def check_password():
     if "password_correct" not in st.session_state:
         st.title("🔐 Acceso Sistema Judicial")
-        email = st.text_input("Correo electrónico")
-        pw = st.text_input("Contraseña", type="password")
+        c1, c2 = st.columns(2)
+        email = c1.text_input("Correo electrónico")
+        pw = c2.text_input("Contraseña", type="password")
         if st.button("Ingresar"):
             if email == "badilla285@gmail.com" and pw == "RPA2026":
                 st.session_state["password_correct"] = True
-                st.session_state["legal_coins"] = 0
+                if "legal_coins" not in st.session_state:
+                    st.session_state["legal_coins"] = 0
                 st.rerun()
-            else: st.error("Credenciales incorrectas")
+            else:
+                st.error("Credenciales incorrectas")
         return False
     return True
 
@@ -45,67 +48,84 @@ class GeneradorOficial:
         self.adolescente = adolescente
 
     def limpiar_tribunal(self, nombre):
+        """Evita el error de redundancia 'Juzgado de Juzgado de...'"""
         if not nombre: return ""
-        # Evita el error de "Juzgado de Juzgado de..."
-        nombre = nombre.upper()
-        if nombre.startswith("JUZGADO DE"): return nombre
-        return f"JUZGADO DE GARANTÍA DE {nombre}"
+        nombre_up = nombre.upper().strip()
+        if nombre_up.startswith("JUZGADO DE"):
+            return nombre_up
+        return f"JUZGADO DE GARANTÍA DE {nombre_up}"
 
     def generar_docx(self, data):
         doc = Document()
         for s in doc.sections:
-            s.left_margin, s.right_margin = Inches(1.2), Inches(1.0)
+            s.left_margin = Inches(1.2)
+            s.right_margin = Inches(1.0)
 
         def add_p(texto_base, bold_all=False, indent=True):
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
-            if indent: p.paragraph_format.first_line_indent = Inches(0.5)
+            if indent: 
+                p.paragraph_format.first_line_indent = Inches(0.5)
             
-            # Corrección punto 8: Regex preciso para evitar negritas erróneas en "mérito"
             def_esc = re.escape(self.defensor.upper())
             ado_esc = re.escape(self.adolescente.upper())
-            patron = f"(RIT|RUC|{def_esc}|{ado_esc}|JUZGADO DE [A-ZÁÉÍÓÚÑ\s]+|\d+-\d{{4}}|\d{{7,10}}-[\dkK])"
             
+            # Patron de negritas sin afectar palabras comunes como 'mérito'
+            patron = f"(RIT|RUC|{def_esc}|{ado_esc}|JUZGADO DE [A-ZÁÉÍÓÚÑ\s]+|\d+-\d{{4}}|\d{{7,10}}-[\dkK])"
             partes = re.split(patron, texto_base, flags=re.IGNORECASE)
+            
             for fragmento in partes:
                 if not fragmento: continue
                 run = p.add_run(fragmento)
-                run.font.name, run.font.size = self.fuente, Pt(self.tamano)
-                if bold_all or (re.match(patron, fragmento, re.IGNORECASE) and fragmento.lower() != "mérito"):
+                run.font.name = self.fuente
+                run.font.size = Pt(self.tamano)
+                
+                # Aplicar negrita si es dato clave, excluyendo explícitamente la palabra mérito
+                if bold_all or (re.match(patron, fragmento, re.IGNORECASE) and "mérito" not in fragmento.lower()):
                     run.bold = True
             return p
 
         # 1. SUMA
         suma = doc.add_paragraph()
+        suma.alignment = WD_ALIGN_PARAGRAPH.LEFT
         r_suma = suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
         r_suma.bold = True
         r_suma.font.name, r_suma.font.size = self.fuente, Pt(self.tamano)
 
-        # 2. TRIBUNAL (Corrección punto 7)
+        # 2. TRIBUNAL
         add_p(f"\n{self.limpiar_tribunal(data['juzgado_ejecucion'])}", bold_all=True, indent=False)
         
-        # 3. COMPARECENCIA
-        # Punto 3: Unir múltiples causas de ejecución en el encabezado
-        causas_str = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_ej_principales'] if c['rit']])
+        # 3. COMPARECENCIA MULTICAUSAL
+        causas_ej_str = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_ej_principales'] if c['rit']])
         comp = (f"\n{self.defensor.upper()}, Abogada, Defensora Penal Pública, en representación de "
-                f"{self.adolescente.upper()}, en causas de ejecución {causas_str}, a S.S., respetuosamente digo:")
+                f"{self.adolescente.upper()}, en causas de ejecución {causas_ej_str}, a S.S., respetuosamente digo:")
         add_p(comp, indent=True)
 
-        # 4. CUERPO
-        add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley RPA, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
-        
+        # 4. CUERPO LEGAL
+        add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de "
+                "Responsabilidad Penal Adolescente, o en subsidio se fije día y hora para celebrar "
+                "audiencia para debatir sobre la extinción de la pena respecto de mi representado, en "
+                "virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
+
+        add_p("Mi representado fue condenado en la siguiente causa de la Ley RPA:")
         for i, c in enumerate(data['causas_rpa'], 1):
             add_p(f"{i}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])} a la pena de {c['sancion']}.")
 
-        add_p("\nEl fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
+        add_p("El fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
         for i, c in enumerate(data['causas_adulto'], 1):
             idx = i + len(data['causas_rpa'])
-            add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])}, con fecha {c['fecha']}, a la pena de {c['pena']}.")
+            add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])}, "
+                  f"con fecha {c['fecha']}, a la pena de {c['pena']}.")
 
+        add_p("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave el delito o conjunto de ellos "
+              "que tuviere asignada en la ley una mayor pena de conformidad con las reglas generales.")
+
+        # 6. PETITORIA (Corrección palabra mérito)
         add_p("\nPOR TANTO,", indent=False)
         add_p("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
 
+        # 7. OTROSÍ
         add_p("\nOTROSÍ: Acompaña sentencia de adulto.", bold_all=True, indent=False)
         add_p("POR TANTO, SOLICITO A S.S. se tenga por acompañada.", indent=False)
 
@@ -114,45 +134,43 @@ class GeneradorOficial:
         buf.seek(0)
         return buf
 
-# --- INTERFAZ ---
+# --- INTERFAZ STREAMLIT ---
 if check_password():
     st.set_page_config(page_title="Generador de Escritos", layout="wide")
     
-    # Inicialización de estados
     if "rpa_list" not in st.session_state: st.session_state.rpa_list = []
     if "adulto_list" not in st.session_state: st.session_state.adulto_list = []
     if "ej_list" not in st.session_state: st.session_state.ej_list = [{"rit":"", "ruc":""}]
 
     # SIDEBAR
     with st.sidebar:
-        # Punto 9: Reloj digital elegante
-        st.markdown(f"#### 🕒 {datetime.now().strftime('%H:%M:%S')}")
+        # Reloj digital discreto
+        st.markdown(f"🕒 **{datetime.now().strftime('%H:%M')}**")
         st.header("🎮 Perfil Judicial")
-        st.info(f"LegalCoins: {st.session_state.legal_coins} 🪙")
-        if st.session_state.legal_coins >= 50:
-            st.success("🔓 ¡Nivel Desbloqueado: Defensor Senior!")
+        st.write(f"LegalCoins: **{st.session_state.legal_coins}** 🪙")
         
         st.markdown("---")
-        st.header("⏳ Calculadora")
-        tipo_res = st.selectbox("Tipo", ["Amparo", "Apelación (5d)", "Nulidad (10d)"])
-        fecha_not = st.date_input("Notificación")
-        if st.button("Ver Vencimiento"):
-            d = 1 if "Amparo" in tipo_res else 5 if "5d" in tipo_res else 10
-            st.error(f"Vence: {(fecha_not + timedelta(days=d)).strftime('%d-%m-%Y')}")
-        
-        st.markdown("---")
-        # Punto 6: Unir PDFs
-        st.header("📂 Unir Documentos")
-        files = st.file_uploader("Adjuntar archivos a unir", accept_multiple_files=True, type="pdf")
-        if st.button("Unir PDFs"):
-            if files:
+        st.header("📂 Unir PDFs")
+        pdfs_to_merge = st.file_uploader("Subir documentos", accept_multiple_files=True, type="pdf")
+        if st.button("Unir Documentos"):
+            if pdfs_to_merge:
                 merger = PyPDF2.PdfMerger()
-                for f in files: merger.append(f)
-                out = io.BytesIO()
-                merger.write(out)
-                st.download_button("⬇️ Descargar PDF Unido", out.getvalue(), "Causa_Unida.pdf")
+                for pdf in pdfs_to_merge:
+                    merger.append(pdf)
+                output = io.BytesIO()
+                merger.write(output)
+                st.download_button("⬇️ Descargar PDF Unido", output.getvalue(), "causa_completa.pdf")
+        
+        st.markdown("---")
+        st.header("⏳ Calculadora de Plazos")
+        tipo_res = st.selectbox("Tipo de Resolución", ["Amparo", "Apelación (5d)", "Apelación (10d)"])
+        fecha_not = st.date_input("Fecha Notificación")
+        if st.button("Calcular Vencimiento"):
+            dias = {"Amparo": 1, "Apelación (5d)": 5, "Apelación (10d)": 10}
+            venc = fecha_not + timedelta(days=dias[tipo_res])
+            st.error(f"Vencimiento: {venc.strftime('%d-%m-%Y')}")
 
-    st.title("⚖️ Generador de Escritos IBL")
+    st.title("⚖️ Generador de Escritos RPA")
 
     # 1. INDIVIDUALIZACIÓN
     st.header("1. Individualización")
@@ -160,20 +178,22 @@ if check_password():
     def_nom = c1.text_input("Defensor/a", "IGNACIO BADILLA LARA")
     imp_nom = c2.text_input("Nombre Adolescente")
     
-    # Punto 2 y 7: Selector de Juzgado
-    juz_ej = c3.selectbox("Juzgado Ejecución", ["Escribir manual..."] + TRIBUNALES_STGO_SM)
-    if juz_ej == "Escribir manual...":
-        juz_ej = c3.text_input("Indique Juzgado manualmente", key="juz_manual")
+    juz_ej_select = c3.selectbox("Juzgado Ejecución", ["Seleccionar...", "Otro (Manual)"] + TRIBUNALES_STGO_SM)
+    if juz_ej_select == "Otro (Manual)":
+        juz_ej = c3.text_input("Escriba Juzgado")
+    else:
+        juz_ej = juz_ej_select
 
-    # Punto 3: Multiples causas de ejecución
-    st.markdown("#### Causas que conoce el Tribunal de Ejecución")
+    # Punto 3: Multiples causas de ejecución (RIT/RUC)
+    st.subheader("Causas en conocimiento del Tribunal")
     for i, item in enumerate(st.session_state.ej_list):
-        col_r1, col_r2, col_r3 = st.columns([4, 4, 1])
-        item['rit'] = col_r1.text_input(f"RIT Ejecución {i+1}", item['rit'], key=f"ej_rit_{i}")
-        item['ruc'] = col_r2.text_input(f"RUC Ejecución {i+1}", item['ruc'], key=f"ej_ruc_{i}")
-        if col_r3.button("❌", key=f"del_ej_{i}"):
+        cols_ej = st.columns([4, 4, 1])
+        item['rit'] = cols_ej[0].text_input(f"RIT Ejecución {i+1}", item['rit'], key=f"ej_rit_{i}")
+        item['ruc'] = cols_ej[1].text_input(f"RUC Ejecución {i+1}", item['ruc'], key=f"ej_ruc_{i}")
+        if cols_ej[2].button("❌", key=f"del_ej_{i}"):
             st.session_state.ej_list.pop(i); st.rerun()
-    if st.button("➕ Agregar Causa de Ejecución"): st.session_state.ej_list.append({"rit":"", "ruc":""}); st.rerun()
+    if st.button("➕ Agregar RIT de Ejecución"):
+        st.session_state.ej_list.append({"rit":"", "ruc":""}); st.rerun()
 
     # 2. CAUSAS RPA
     st.header("2. Causas RPA")
@@ -190,7 +210,7 @@ if check_password():
     # 3. CONDENAS ADULTO
     st.header("3. Condenas Adulto")
     for i, item in enumerate(st.session_state.adulto_list):
-        cols = st.columns([2, 2, 3, 2, 2, 0.5])
+        cols = st.columns([2, 2, 2, 2, 2, 0.5])
         item['rit'] = cols[0].text_input("RIT Ad", item['rit'], key=f"a_rit_{i}")
         item['ruc'] = cols[1].text_input("RUC Ad", item['ruc'], key=f"a_ruc_{i}")
         item['juzgado'] = cols[2].selectbox("Juzgado Ad", TRIBUNALES_STGO_SM, key=f"a_juz_{i}")
@@ -201,17 +221,20 @@ if check_password():
     if st.button("➕ Agregar Condena Adulto"): st.session_state.adulto_list.append({"rit":"", "ruc":"", "juzgado":"", "pena":"", "fecha":""}); st.rerun()
 
     # 4. GENERACIÓN
-    if st.button("🚀 GENERAR ESCRITO ROBUSTO", use_container_width=True):
+    if st.button("🚀 GENERAR ESCRITO WORD", use_container_width=True):
         if not imp_nom or not st.session_state.ej_list[0]['rit']:
-            st.error("⚠️ Faltan datos críticos.")
+            st.error("⚠️ Datos faltantes.")
         else:
-            # Punto 5: Sumar LegalCoins al generar
+            # Sumar LegalCoins
             st.session_state.legal_coins += 10
             datos = {
-                "defensor": def_nom, "adolescente": imp_nom, "juzgado_ejecucion": juz_ej, 
+                "defensor": def_nom, 
+                "adolescente": imp_nom, 
+                "juzgado_ejecucion": juz_ej, 
                 "causas_ej_principales": st.session_state.ej_list,
-                "causas_rpa": st.session_state.rpa_list, "causas_adulto": st.session_state.adulto_list
+                "causas_rpa": st.session_state.rpa_list, 
+                "causas_adulto": st.session_state.adulto_list
             }
             gen = GeneradorOficial(def_nom, imp_nom)
-            st.download_button("⬇️ Descargar Escrito Cambria 12", gen.generar_docx(datos), f"Extincion_{imp_nom}.docx", use_container_width=True)
+            st.download_button("⬇️ Descargar Word", gen.generar_docx(datos), f"Extincion_{imp_nom}.docx", use_container_width=True)
             st.balloons()
