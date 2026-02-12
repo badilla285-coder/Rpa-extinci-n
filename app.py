@@ -30,7 +30,6 @@ if "usuarios_db" not in st.session_state:
         "colega1@pjud.cl": {"nombre": "DEFENSOR ASOCIADO 1", "pw": "LEGAL2026", "nivel": "Usuario"},
     }
 
-# Inicialización de variables de formulario para persistencia entre pestañas/sesiones
 if "form_data" not in st.session_state:
     st.session_state.form_data = {
         "imp_nom": "",
@@ -99,24 +98,31 @@ class GeneradorOficial:
         r_suma = suma.add_run("EN LO PRINCIPAL: SOLICITA EXTINCIÓN;\nOTROSÍ: ACOMPAÑA DOCUMENTO.")
         r_suma.bold = True
         r_suma.font.name, r_suma.font.size = self.fuente, Pt(self.tamano)
+        
         add_p(f"\n{self.limpiar_tribunal(data['juzgado_ejecucion'])}", bold_all=True, indent=False)
+        
         causas_ej_str = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_ej_principales'] if c['rit']])
         comp = (f"\n{self.defensor.upper()}, Abogada, Defensora Penal Pública, en representación de "
                 f"{self.adolescente.upper()}, en causas de ejecución {causas_ej_str}, a S.S., respetuosamente digo:")
         add_p(comp, indent=True)
+        
         add_p("\nQue, vengo en solicitar que declare la extinción de las sanciones de la Ley de Responsabilidad Penal Adolescente, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
+        
         for i, c in enumerate(data['causas_rpa'], 1):
             add_p(f"{i}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])} a la pena de {c['sancion']}.")
+        
         add_p("\nEl fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
         for i, c in enumerate(data['causas_adulto'], 1):
             idx = i + len(data['causas_rpa'])
             add_p(f"{idx}. RIT: {c['rit']}, RUC: {c['ruc']}: Condenado por el {self.limpiar_tribunal(c['juzgado'])}, con fecha {c['fecha']}, a la pena de {c['pena']}.")
+        
         add_p("\nPOR TANTO,", indent=False)
         add_p("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
         
         rits_adulto = ", ".join([f"RIT: {c['rit']} (RUC: {c['ruc']})" for c in data['causas_adulto'] if c['rit']])
         add_p(f"\nOTROSÍ: Acompaña sentencias de adulto de mi representado de las causas {rits_adulto}.", bold_all=True, indent=False)
         add_p("POR TANTO, SOLICITO A S.S. se tengan por acompañadas.", indent=False)
+        
         buf = io.BytesIO(); doc.save(buf); buf.seek(0)
         return buf
 
@@ -154,7 +160,6 @@ if check_password():
         st.header("1. Individualización")
         c1, c2, c3 = st.columns(3)
         def_nom = c1.text_input("Defensor/a", st.session_state.user_name)
-        # Sincronización con session_state para persistencia
         st.session_state.form_data["imp_nom"] = c2.text_input("Nombre Adolescente", value=st.session_state.form_data["imp_nom"])
         st.session_state.form_data["juz_ej_sel"] = c3.selectbox("Juzgado Ejecución", ["Seleccionar..."] + TRIBUNALES_STGO_SM, index=(["Seleccionar..."] + TRIBUNALES_STGO_SM).index(st.session_state.form_data["juz_ej_sel"]))
         
@@ -166,7 +171,6 @@ if check_password():
             cols_ej = st.columns([4, 4, 1])
             item['rit'] = cols_ej[0].text_input(f"RIT {i+1}", item['rit'], key=f"ej_rit_{i}")
             item['ruc'] = cols_ej[1].text_input(f"RUC {i+1}", item['ruc'], key=f"ej_ruc_{i}")
-            # Validador de RUC eliminado según solicitud
             if cols_ej[2].button("❌", key=f"del_ej_{i}"):
                 st.session_state.form_data["ej_list"].pop(i); st.rerun()
         
@@ -178,7 +182,6 @@ if check_password():
             cols = st.columns([2, 2, 3, 3, 0.5])
             item['rit'] = cols[0].text_input("RIT RPA", item['rit'], key=f"r_rit_{i}")
             item['ruc'] = cols[1].text_input("RUC RPA", item['ruc'], key=f"r_ruc_{i}")
-            # Persistencia del juzgado seleccionado
             default_idx = TRIBUNALES_STGO_SM.index(item['juzgado']) if item['juzgado'] in TRIBUNALES_STGO_SM else 0
             item['juzgado'] = cols[2].selectbox("Juzgado RPA", TRIBUNALES_STGO_SM, index=default_idx, key=f"r_juz_{i}")
             item['sancion'] = cols[3].text_input("Sanción", item['sancion'], key=f"r_san_{i}")
@@ -200,11 +203,7 @@ if check_password():
         if st.button("➕ Agregar Condena Adulto"): st.session_state.form_data["adulto_list"].append({"rit":"", "ruc":"", "juzgado":TRIBUNALES_STGO_SM[0], "pena":"", "fecha":""}); st.rerun()
 
         st.markdown("---")
-        st.header("📄 Documentación de Respaldo (Otrosí)")
-        st.info("Adjunte las sentencias de adulto para generar un archivo consolidado.")
-        sentencias_respaldo = st.file_uploader("Adjuntar Sentencias (PDF)", accept_multiple_files=True, type="pdf", key="respaldo")
-
-        if st.button("🚀 GENERAR ESCRITO Y ADJUNTAR SENTENCIAS", use_container_width=True):
+        if st.button("🚀 GENERAR ESCRITO", use_container_width=True):
             if not imp_nom or not st.session_state.form_data["ej_list"][0]['rit']:
                 st.error("⚠️ Faltan datos críticos.")
             else:
@@ -218,12 +217,6 @@ if check_password():
                 gen = GeneradorOficial(def_nom, imp_nom)
                 word_buf = gen.generar_docx(datos)
                 st.download_button("⬇️ Descargar Escrito (Word)", word_buf, f"Extincion_{imp_nom}.docx")
-                
-                if sentencias_respaldo:
-                    merger_r = PyPDF2.PdfMerger()
-                    for s in sentencias_respaldo: merger_r.append(s)
-                    out_r = io.BytesIO(); merger_r.write(out_r)
-                    st.download_button("⬇️ Descargar Sentencias Consolidadas (PDF)", out_r.getvalue(), f"Sentencias_{imp_nom}.pdf")
                 st.balloons()
 
     with tab2:
@@ -245,13 +238,6 @@ if check_password():
 
             st.markdown("---")
             st.subheader("📋 Usuarios Registrados")
-            h_col1, h_col2, h_col3, h_col4 = st.columns([3, 3, 2, 1])
-            h_col1.markdown("**Email**")
-            h_col2.markdown("**Nombre**")
-            h_col3.markdown("**Nivel**")
-            h_col4.markdown("**Acción**")
-            st.divider()
-
             for email, info in list(st.session_state.usuarios_db.items()):
                 b_col1, b_col2, b_col3, b_col4 = st.columns([3, 3, 2, 1])
                 b_col1.write(email)
