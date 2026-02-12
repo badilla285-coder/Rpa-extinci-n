@@ -2,3 +2,5 @@ streamlit
 python-docx
 PyPDF2
 pandas
+pdf2image
+Pillow
