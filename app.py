@@ -99,6 +99,7 @@ class GeneradorOficialIABL:
     def aplicar_formato(self, doc, texto, bold_all=False, indent=True, align="JUSTIFY"):
         p = doc.add_paragraph()
         if align == "LEFT": p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        elif align == "CENTER": p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         else: p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
@@ -107,7 +108,7 @@ class GeneradorOficialIABL:
         # Respetar negritas en nombres, causas y POR TANTO
         def_esc = re.escape(self.defensor.upper())
         ado_esc = re.escape(self.adolescente.upper())
-        patron = r"(RIT:?\s?\d+-\d{4}|RUC:?\s?\d{7,10}-[\dkK]|POR TANTO|OTROSÍ|SOLICITA|INTERPONE|{0}|{1})".format(def_esc, ado_esc)
+        patron = r"(RIT:?\s?\d+-\d{4}|RUC:?\s?\d{7,10}-[\dkK]|POR TANTO|OTROSÍ|SOLICITA|INTERPONE|ACCIÓN CONSTITUCIONAL|{0}|{1})".format(def_esc, ado_esc)
         
         partes = re.split(patron, texto, flags=re.IGNORECASE)
         for frag in partes:
@@ -123,9 +124,6 @@ class GeneradorOficialIABL:
         for s in doc.sections:
             s.left_margin, s.right_margin = Inches(1.2), Inches(1.0)
         
-        # Lógica de encabezados según tipo (Se completa en la Parte 2)
-        # --- CONTINUACIÓN DE LA CLASE GeneradorOficialIABL (DENTRO DE generar_escrito) ---
-        
         if tipo == "Extinción Art. 25 ter":
             self.aplicar_formato(doc, "EN LO PRINCIPAL: SOLICITA EXTINCIÓN; OTROSÍ: ACOMPAÑA SENTENCIA", bold_all=True, indent=False, align="LEFT")
             self.aplicar_formato(doc, f"\n{data['juzgado_ejecucion'].upper()}", bold_all=True, indent=False)
@@ -133,7 +131,6 @@ class GeneradorOficialIABL:
             self.aplicar_formato(doc, comp)
             self.aplicar_formato(doc, "Que, vengo en solicitar que se declare la extinción de las sanciones de la Ley de Responsabilidad Penal Adolescente, o en subsidio se fije día y hora para celebrar audiencia para debatir sobre la extinción de la pena respecto de mi representado, en virtud de lo dispuesto en los artículos 25 ter y 25 quinquies de la Ley 20.084.")
             self.aplicar_formato(doc, "El fundamento radica en la existencia de una condena de mayor gravedad como adulto, la cual se detalla a continuación.")
-            # Se itera sobre las causas RPA y Adulto proporcionadas en 'data'
             self.aplicar_formato(doc, "POR TANTO, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.")
             self.aplicar_formato(doc, f"OTROSÍ: Acompaña sentencia de adulto de las causas {data['causas_adulto_str']}", bold_all=True, indent=False)
 
@@ -142,18 +139,18 @@ class GeneradorOficialIABL:
             self.aplicar_formato(doc, f"\n{data['juzgado_ejecucion'].upper()}", bold_all=True, indent=False)
             comp = f"\n{self.defensor.upper()}, Abogada, Defensora Penal Pública, en representación de {self.adolescente.upper()}, en causas {data['causas_str']}, a S.S. respetuosamente digo:"
             self.aplicar_formato(doc, comp)
-            self.aplicar_formato(doc, "Que, vengo en solicitar se sirva fijar día y hora para celebrar audiencia con el objeto de debatir sobre la prescripción de la pena, de conformidad a lo dispuesto en el artículo 5 de la Ley N° 20.084 y las normas pertinentes del Código Penal.")
-            self.aplicar_formato(doc, "Teniendo presente el tiempo transcurrido desde que las sentencias quedaron ejecutoriadas, ha transcurrido en exceso el plazo legal exigido.")
+            self.aplicar_formato(doc, "Que, por medio de la presente, vengo en solicitar a S.S. se sirva fijar día y hora para celebrar audiencia con el objeto de debatir sobre la prescripción de la pena respecto de mi representado, de conformidad a lo dispuesto en el artículo 5 de la Ley N° 20.084 y las normas pertinentes del Código Penal.")
+            self.aplicar_formato(doc, "Teniendo presente el tiempo transcurrido desde que las referidas sentencias quedaron ejecutoriadas, ha transcurrido en exceso el plazo legal exigido.")
             self.aplicar_formato(doc, "POR TANTO, SOLICITO A S.S. acceder a lo solicitado, fijando día y hora para celebrar audiencia y declarar el sobreseimiento definitivo.")
             self.aplicar_formato(doc, "OTROSÍ: Solicito se oficie a Extranjería para informar movimientos migratorios y se incorpore Extracto de Filiación actualizado.", bold_all=True, indent=False)
 
         elif tipo == "Amparo Constitucional":
             self.aplicar_formato(doc, "INTERPONE ACCIÓN CONSTITUCIONAL DE AMPARO; OTROSÍ: ORDEN DE NO INNOVAR", bold_all=True, indent=False, align="LEFT")
             self.aplicar_formato(doc, "\nILTMA. CORTE DE APELACIONES DE SANTIAGO", bold_all=True, indent=False)
-            comp = f"\n{self.defensor.upper()}, abogada, Defensora Penal Juvenil, en representación de {self.adolescente.upper()}, en causa RIT {data['rit_prin']}, RUC {data['ruc_prin']} del Juzgado de Garantía, a V.S.I respetuosamente digo:"
+            comp = f"\n{self.defensor.upper()}, abogada, Defensora Penal Juvenil, en representación de {self.adolescente.upper()}, en causa RIT {data['rit_prin']}, RUC {data['ruc_prin']}, a V.S.I respetuosamente digo:"
             self.aplicar_formato(doc, comp)
             self.aplicar_formato(doc, "Que, en virtud de lo dispuesto en el artículo 21 de la Constitución Política de la República, vengo en deducir acción constitucional de amparo por la perturbación grave e ilegítima a la libertad personal, emanada de la resolución que ordenó el ingreso inmediato del joven, siendo esta ilegal y arbitraria.")
-            self.aplicar_formato(doc, "La resolución infringe el artículo 79 del Código Penal: 'no podrá ejecutarse pena alguna sino en virtud de sentencia ejecutoriada'.")
+            self.aplicar_formato(doc, "La resolución infringe el artículo 79 del Código Penal que establece que no podrá ejecutarse pena alguna sino en virtud de sentencia ejecutoriada.")
             self.aplicar_formato(doc, "POR TANTO, SOLICITO A V.S. ILTMA. dejar sin efecto la resolución recurrida y restablecer el imperio del derecho.")
             self.aplicar_formato(doc, "OTROSÍ: Solicito Orden de No Innovar para suspender los efectos de la ilegalidad atacada.", bold_all=True, indent=False)
 
@@ -171,9 +168,8 @@ class GeneradorOficialIABL:
         buf.seek(0)
         return buf
 
-# --- FUNCIONES DE PERSISTENCIA Y USUARIOS ---
+# --- FUNCIONES DE PERSISTENCIA Y LOGIN ---
 def guardar_gestion_iabl(ruc, rit, tribunal, tipo, contenido):
-    """Guarda en Supabase usando las columnas exactas solicitadas."""
     try:
         data_insert = {
             "RUC": ruc,
@@ -188,177 +184,123 @@ def guardar_gestion_iabl(ruc, rit, tribunal, tipo, contenido):
         st.error(f"Error crítico en Base de Datos: {e}")
         return False
 
+def check_password():
+    if "auth_user" not in st.session_state:
+        st.title("🔐 Acceso Suite IABL Pro")
+        email = st.text_input("Email institucional")
+        pw = st.text_input("Contraseña", type="password")
+        if st.button("Ingresar"):
+            if email in st.session_state.usuarios_db and st.session_state.usuarios_db[email]["pw"] == pw:
+                st.session_state["auth_user"] = email
+                st.session_state["user_name"] = st.session_state.usuarios_db[email]["nombre"]
+                st.session_state["is_admin"] = (st.session_state.usuarios_db[email]["nivel"] == "Admin")
+                st.rerun()
+            else:
+                st.error("Credenciales incorrectas")
+        return False
+    return True
+
 # --- TRANSCRIPTOR INTELIGENTE (AUDIOS A TEXTO) ---
 def transcribir_audiencia(archivo_audio):
-    """Integración futura con Gemini 1.5 Pro para audios largos."""
     st.info("Función de transcripción íntegra activada. Procesando audio...")
-    # Lógica de carga de archivo a API de Google
     return "Texto íntegro de la audiencia transcrito por IA..."
 
 # --- GESTIÓN DE ESTADO DE FORMULARIO ---
+if "usuarios_db" not in st.session_state:
+    st.session_state.usuarios_db = {"badilla285@gmail.com": {"nombre": "IGNACIO BADILLA LARA", "pw": "RPA2026", "nivel": "Admin"}}
+
 if "form_data" not in st.session_state:
     st.session_state.form_data = {
-        "imp_nom": "", "juz_ej_sel": "Seleccionar...",
+        "imp_nom": "", "juz_ej_sel": "San Bernardo",
         "rpa_list": [], "adulto_list": [],
         "ej_list": [{"rit":"", "ruc":""}],
         "fecha_ad": None, "es_rpa_semaforo": True
     }
-    # --- CONTINUACIÓN DE LA INTERFAZ STREAMLIT ---
 
+# --- INTERFAZ STREAMLIT ---
 if check_password():
     with st.sidebar:
         st.title("💼 Suite Legal IABL")
         st.write(f"Usuario: **{st.session_state.user_name}**")
-        
-        # --- MÓDULO DE SUSCRIPCIONES Y PAGOS ---
         st.divider()
         st.subheader("💳 Planes y Suscripciones")
         if st.session_state.get("legal_coins", 0) < 10:
-            st.warning(f"Saldo bajo: {st.session_state.get('legal_coins', 0)} LegalCoins")
-            if st.button("Comprar Créditos (Stripe/Webpay)"):
-                st.info("Redirigiendo a pasarela de pagos segura...")
+            st.warning(f"Saldo: {st.session_state.get('legal_coins', 0)} LegalCoins")
+            if st.button("💳 Comprar LegalCoins"): st.info("Pasarela en desarrollo...")
         else:
-            st.success(f"Créditos disponibles: {st.session_state.get('legal_coins', 0)}")
+            st.success(f"Créditos: {st.session_state.get('legal_coins', 0)}")
         
         st.divider()
         tipo_escrito = st.selectbox("📝 Recurso a Generar", 
             ["Extinción Art. 25 ter", "Prescripción de la Pena", "Amparo Constitucional", "Apelación por Quebrantamiento"])
         
-        # --- SEMÁFORO DE PLAZOS INTELIGENTE ---
         st.subheader("📊 Semáforo de Plazos")
         if st.session_state.form_data.get("fecha_ad"):
-            # Diferenciación automática: RPA (Art. 5 Ley 20.084) vs Adultos
-            status = calcular_semaforo(
-                st.session_state.form_data["fecha_ad"], 
-                st.session_state.form_data.get("es_rpa_semaforo", True)
-            )
+            status = calcular_semaforo(st.session_state.form_data["fecha_ad"], st.session_state.form_data.get("es_rpa_semaforo", True))
             st.info(status)
         else:
             st.write("Sube una sentencia para calcular plazos.")
 
-    # --- PESTAÑAS PRINCIPALES ---
-    tab_ia, tab_audio, tab_form, tab_admin = st.tabs([
-        "🤖 Carga Inteligente (IA)", 
-        "🎙️ Transcriptor", 
-        "📄 Datos del Recurso", 
-        "⚙️ Administración"
-    ])
+    tab_ia, tab_audio, tab_form, tab_admin = st.tabs(["🤖 IA", "🎙️ Transcriptor", "📄 Formulario", "⚙️ Admin"])
 
     with tab_ia:
         st.header("⚡ Asistente Gemini 1.5 Flash")
-        st.write("Automatiza el llenado de apartados mediante lectura de PDFs.")
-        
         c_ia1, c_ia2, c_ia3 = st.columns(3)
         with c_ia1:
             st.markdown("### 1. Ejecución")
-            pdf_ej = st.file_uploader("Acta de Ejecución", type=["pdf"], key="up_ej_final")
-            if pdf_ej and st.button("Procesar Ejecución", key="btn_ej"):
-                with st.spinner("Analizando acta..."):
-                    reader = PyPDF2.PdfReader(pdf_ej)
-                    texto = "".join([p.extract_text() for p in reader.pages[:3]])
-                    res = analizar_pdf_legal(texto, "Acta de Ejecución")
-                    if res:
-                        st.session_state.form_data["ej_list"][0]["rit"] = res.get("rit", "")
-                        st.session_state.form_data["ej_list"][0]["ruc"] = res.get("ruc", "")
-                        st.session_state.form_data["imp_nom"] = res.get("imputado", "")
-                        st.session_state.form_data["juz_ej_sel"] = res.get("tribunal", "Juzgado de Garantía de San Bernardo")
-                        st.success("Apartado 1 cargado automáticamente.")
+            pdf_ej = st.file_uploader("Acta de Ejecución", type=["pdf"], key="up_ej")
+            if pdf_ej and st.button("Procesar Ejecución"):
+                reader = PyPDF2.PdfReader(pdf_ej)
+                res = analizar_pdf_legal("".join([p.extract_text() for p in reader.pages[:3]]), "Acta de Ejecución")
+                if res:
+                    st.session_state.form_data["ej_list"][0].update({"rit": res["rit"], "ruc": res["ruc"]})
+                    st.session_state.form_data["imp_nom"] = res["imputado"]
+                    st.success("Cargado")
 
         with c_ia2:
             st.markdown("### 2. Sentencia RPA")
-            pdf_rpa = st.file_uploader("Sentencia Ley 20.084", type=["pdf"], key="up_rpa_final")
-            if pdf_rpa and st.button("Procesar RPA", key="btn_rpa"):
-                with st.spinner("Analizando condena RPA..."):
-                    reader = PyPDF2.PdfReader(pdf_rpa)
-                    texto = "".join([p.extract_text() for p in reader.pages[:3]])
-                    res = analizar_pdf_legal(texto, "Sentencia RPA")
-                    if res:
-                        st.session_state.form_data["rpa_list"].append({
-                            "rit": res.get("rit", ""), "ruc": res.get("ruc", ""), 
-                            "juzgado": res.get("tribunal", ""), "sancion": res.get("sancion_pena", "")
-                        })
-                        st.session_state.form_data["es_rpa_semaforo"] = True
-                        st.success("Apartado 2 (RPA) actualizado.")
+            pdf_rpa = st.file_uploader("Sentencia RPA", type=["pdf"], key="up_rpa")
+            if pdf_rpa and st.button("Procesar RPA"):
+                reader = PyPDF2.PdfReader(pdf_rpa)
+                res = analizar_pdf_legal("".join([p.extract_text() for p in reader.pages[:3]]), "Sentencia RPA")
+                if res:
+                    st.session_state.form_data["rpa_list"].append({"rit": res["rit"], "sancion": res["sancion_pena"]})
+                    st.session_state.form_data["es_rpa_semaforo"] = True
+                    st.success("Añadido")
 
         with c_ia3:
             st.markdown("### 3. Sentencia Adulto")
-            pdf_ad = st.file_uploader("Condena Adulto (CP)", type=["pdf"], key="up_ad_final")
-            if pdf_ad and st.button("Procesar Adulto", key="btn_ad"):
-                with st.spinner("Analizando condena Adulto..."):
-                    reader = PyPDF2.PdfReader(pdf_ad)
-                    texto = "".join([p.extract_text() for p in reader.pages[:3]])
-                    res = analizar_pdf_legal(texto, "Sentencia Adulto")
-                    if res:
-                        st.session_state.form_data["adulto_list"].append({
-                            "rit": res.get("rit", ""), "ruc": res.get("ruc", ""), 
-                            "juzgado": res.get("tribunal", ""), "pena": res.get("sancion_pena", ""),
-                            "fecha": res.get("fecha_sentencia", "")
-                        })
-                        st.session_state.form_data["fecha_ad"] = res.get("fecha_sentencia", "")
-                        st.session_state.form_data["es_rpa_semaforo"] = False
-                        st.success("Apartado 3 cargado y Semáforo activado.")
+            pdf_ad = st.file_uploader("Sentencia Adulto", type=["pdf"], key="up_ad")
+            if pdf_ad and st.button("Procesar Adulto"):
+                reader = PyPDF2.PdfReader(pdf_ad)
+                res = analizar_pdf_legal("".join([p.extract_text() for p in reader.pages[:3]]), "Sentencia Adulto")
+                if res:
+                    st.session_state.form_data["adulto_list"].append({"rit": res["rit"]})
+                    st.session_state.form_data["fecha_ad"] = res["fecha_sentencia"]
+                    st.session_state.form_data["es_rpa_semaforo"] = False
+                    st.success("Cargado")
 
     with tab_audio:
-        st.header("🎙️ Transcriptor Inteligente de Audiencias")
-        st.write("Sube el audio de la audiencia para obtener la transcripción íntegra.")
-        archivo_audio = st.file_uploader("Subir Audio (MP3, WAV, M4A)", type=["mp3", "wav", "m4a"])
-        if archivo_audio and st.button("Comenzar Transcripción"):
-            texto_transcrito = transcribir_audiencia(archivo_audio)
-            st.text_area("Resultado de la Transcripción", value=texto_transcrito, height=400)
+        st.header("🎙️ Transcripción")
+        st.file_uploader("Audio de Audiencia", type=["mp3", "wav"])
 
     with tab_form:
         st.header(f"Gestión: {tipo_escrito}")
-        
-        # --- FORMULARIO DINÁMICO ---
-        with st.form("main_legal_form"):
-            st.subheader("Datos de Individualización")
+        with st.form("main_form"):
             c1, c2 = st.columns(2)
-            def_nom_input = c1.text_input("Defensor/a", st.session_state.user_name)
-            imp_nom_input = c2.text_input("Nombre Adolescente", st.session_state.form_data["imp_nom"])
-            juz_sel = st.selectbox("Juzgado de Ejecución", TRIBUNALES_STGO_SM, 
-                                 index=TRIBUNALES_STGO_SM.index(st.session_state.form_data["juz_ej_sel"]) if st.session_state.form_data["juz_ej_sel"] in TRIBUNALES_STGO_SM else 0)
-            
-            st.markdown("---")
-            if st.form_submit_button(f"⚖️ GENERAR Y GUARDAR {tipo_escrito.upper()}"):
-                if not imp_nom_input:
-                    st.error("Faltan datos críticos.")
-                else:
-                    # Lógica de construcción de datos para el motor Docx
-                    datos_finales = {
-                        "juzgado_ejecucion": juz_sel,
-                        "causas_ej_str": ", ".join([c['rit'] for c in st.session_state.form_data["ej_list"] if c['rit']]),
-                        "causas_adulto_str": ", ".join([c['rit'] for c in st.session_state.form_data["adulto_list"] if c['rit']]),
-                        "rit_prin": st.session_state.form_data["ej_list"][0]["rit"],
-                        "ruc_prin": st.session_state.form_data["ej_list"][0]["ruc"]
-                    }
-                    
-                    # 1. Generar Documento
-                    gen = GeneradorOficialIABL(def_nom_input, imp_nom_input)
-                    word_file = gen.generar_escrito(tipo_escrito, datos_finales)
-                    
-                    # 2. Guardar en Supabase (Columnas exactas solicitadas)
-                    res_db = guardar_gestion_iabl(
-                        datos_finales["ruc_prin"], 
-                        datos_finales["rit_prin"], 
-                        juz_sel, 
-                        tipo_escrito, 
-                        f"Escrito generado íntegramente para {imp_nom_input}."
-                    )
-                    
-                    st.download_button(f"📂 Descargar {tipo_escrito}.docx", word_file, f"{tipo_escrito}_{imp_nom_input}.docx")
-                    if res_db: st.toast("Sincronizado con Base de Datos IABL", icon="☁️")
-                    st.balloons()
+            def_n = c1.text_input("Defensor/a", st.session_state.user_name)
+            imp_n = c2.text_input("Adolescente", st.session_state.form_data["imp_nom"])
+            juz = st.selectbox("Tribunal", TRIBUNALES_STGO_SM)
+            if st.form_submit_button("⚖️ GENERAR Y GUARDAR"):
+                dat = {"juzgado_ejecucion": juz, "causas_ej_str": st.session_state.form_data["ej_list"][0]["rit"], "causas_adulto_str": "", "rit_prin": st.session_state.form_data["ej_list"][0]["rit"], "ruc_prin": st.session_state.form_data["ej_list"][0]["ruc"], "causas_str": ""}
+                word = GeneradorOficialIABL(def_n, imp_n).generar_escrito(tipo_escrito, dat)
+                guardar_gestion_iabl(dat["ruc_prin"], dat["rit_prin"], juz, tipo_escrito, f"Escrito para {imp_n}")
+                st.download_button("Descargar Word", word, f"{tipo_escrito}.docx")
+                st.balloons()
 
     with tab_admin:
-        st.header("⚙️ Administración de Usuarios")
-        if st.session_state.get("is_admin", False):
-            st.subheader("Control de Suscripciones")
-            # Simulación de tabla de usuarios de Supabase
-            usuarios_data = [{"Email": k, "Nombre": v["nombre"], "Nivel": v["nivel"]} for k, v in st.session_state.usuarios_db.items()]
-            st.table(usuarios_data)
-            st.info("Módulo de gestión de pagos vía API de Stripe/Webpay en desarrollo.")
-        else:
-            st.warning("Acceso restringido a administradores.")
+        if st.session_state.is_admin:
+            st.table([{"Email": k, "Nombre": v["nombre"]} for k, v in st.session_state.usuarios_db.items()])
 
     st.markdown("---")
     st.markdown("<div style='text-align: center; color: gray;'>Suite Legal Pro - <b>IGNACIO ANTONIO BADILLA LARA</b> - Defensoría Penal Pública</div>", unsafe_allow_html=True)
