@@ -6,6 +6,13 @@ import io
 import re
 from datetime import datetime, timedelta
 import PyPDF2
+from supabase import create_client, Client # NUEVA LIBRERÍA
+
+# --- CONFIGURACIÓN DE BASE DE DATOS (NUEVO) ---
+# Reemplaza con tus credenciales reales que obtuviste en el paso anterior
+SUPABASE_URL = "https://zblcddxbhyomkasmbvyz.supabase.co"
+SUPABASE_KEY = "TU_CLAVE_PUBLICABLE_AQUI" 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- CONFIGURACIÓN Y LISTAS ---
 TRIBUNALES_STGO_SM = [
@@ -79,11 +86,8 @@ class GeneradorOficial:
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
             if indent: p.paragraph_format.first_line_indent = Inches(0.5)
             
-            # Patrón estricto de negritas solicitado:
-            # Nombres, RUC + número, RIT + número, Defensor, Sanción, POR TANTO, OTROSÍ
             def_esc = re.escape(self.defensor.upper())
             ado_esc = re.escape(self.adolescente.upper())
-            # Capturamos la sanción si viene identificada (en el bucle se maneja)
             patron = f"(RIT:?\s?\d+-\d{{4}}|RUC:?\s?\d{{7,10}}-[\dkK]|{def_esc}|{ado_esc}|POR TANTO|OTROSÍ|JUZGADO DE [A-ZÁÉÍÓÚÑ\s]+)"
             
             partes = re.split(patron, texto_base, flags=re.IGNORECASE)
@@ -120,7 +124,6 @@ class GeneradorOficial:
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
             p.paragraph_format.first_line_indent = Inches(0.5)
-            # Aplicamos negrita manual a RIT, RUC y Sanción
             p.add_run(f"{i}. ").font.name = self.fuente
             p.add_run(f"RIT: {c['rit']}").bold = True
             p.add_run(", ").font.name = self.fuente
@@ -161,7 +164,8 @@ class GeneradorOficial:
 
 # --- INTERFAZ STREAMLIT ---
 if check_password():
-    st.set_page_config(page_title="Generador Judicial IBL", layout="wide")
+    # El set_page_config debe ir al principio si no se ha llamado
+    # st.set_page_config(page_title="Generador Judicial IBL", layout="wide") 
 
     with st.sidebar:
         st.header("👤 Perfil Profesional")
@@ -227,11 +231,26 @@ if check_password():
                     "causas_ej_principales": st.session_state.form_data["ej_list"],
                     "causas_rpa": st.session_state.form_data["rpa_list"], "causas_adulto": st.session_state.form_data["adulto_list"]
                 }
+                
+                # --- NUEVA LÓGICA DE GUARDADO EN NUBE ---
+                try:
+                    # Preparamos la data para Supabase
+                    registro_nube = {
+                        "RUC": st.session_state.form_data["ej_list"][0]['ruc'],
+                        "RIT": st.session_state.form_data["ej_list"][0]['rit'],
+                        "TRIBUNAL / J": juz_ej,
+                        "TIPO_RECURS": "Extinción Art. 25 ter",
+                        "CONTENIDO_": f"Escrito generado para {imp_nom}. Incluye {len(st.session_state.form_data['rpa_list'])} causas RPA."
+                    }
+                    supabase.table("Gestiones").insert(registro_nube).execute()
+                except Exception as db_err:
+                    st.warning(f"Escrito generado, pero no se pudo guardar en la nube: {db_err}")
+
+                # Seguimos con tu lógica original de Word
                 gen = GeneradorOficial(def_nom, imp_nom)
                 word_buf = gen.generar_docx(datos)
                 st.download_button("📂 Descargar Escrito Formateado (Word)", word_buf, f"Extincion_{imp_nom}.docx")
-                # Animación elegante y profesional
-                st.toast('Documento jurídico generado con éxito.', icon='⚖️')
+                st.toast('Documento jurídico generado y guardado en la nube.', icon='⚖️')
                 st.success("El escrito ha sido procesado siguiendo los estándares de la Defensoría Penal Pública.")
 
     with tab2:
