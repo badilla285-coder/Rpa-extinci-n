@@ -6,13 +6,17 @@ import io
 import re
 from datetime import datetime, timedelta
 import PyPDF2
-from supabase import create_client, Client # NUEVA LIBRERÍA
+from supabase import create_client, Client
 
-# --- CONFIGURACIÓN DE BASE DE DATOS (NUEVO) ---
-# Reemplaza con tus credenciales reales que obtuviste en el paso anterior
+# --- CONFIGURACIÓN DE BASE DE DATOS ---
+# Usamos tus credenciales confirmadas para evitar el error 401
 SUPABASE_URL = "https://zblcddxbhyomkasmbvyz.supabase.co"
-SUPABASE_KEY = "TU_CLAVE_PUBLICABLE_AQUI" 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_KEY = "sb_publishable_pHMqXxI39AssehHdBs1wqA_NVjPc-FT" 
+
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error(f"Error en la conexión con Supabase: {e}")
 
 # --- CONFIGURACIÓN Y LISTAS ---
 TRIBUNALES_STGO_SM = [
@@ -163,10 +167,8 @@ class GeneradorOficial:
         return buf
 
 # --- INTERFAZ STREAMLIT ---
+# Nota: st.set_page_config se maneja dentro de check_password o al inicio absoluto
 if check_password():
-    # El set_page_config debe ir al principio si no se ha llamado
-    # st.set_page_config(page_title="Generador Judicial IBL", layout="wide") 
-
     with st.sidebar:
         st.header("👤 Perfil Profesional")
         st.write(f"Defensor: **{st.session_state.user_name}**")
@@ -232,25 +234,24 @@ if check_password():
                     "causas_rpa": st.session_state.form_data["rpa_list"], "causas_adulto": st.session_state.form_data["adulto_list"]
                 }
                 
-                # --- NUEVA LÓGICA DE GUARDADO EN NUBE ---
+                # --- GUARDADO EN NUBE (SUPABASE) ---
                 try:
-                    # Preparamos la data para Supabase
                     registro_nube = {
                         "RUC": st.session_state.form_data["ej_list"][0]['ruc'],
                         "RIT": st.session_state.form_data["ej_list"][0]['rit'],
                         "TRIBUNAL / J": juz_ej,
-                        "TIPO_RECURS": "Extinción Art. 25 ter",
-                        "CONTENIDO_": f"Escrito generado para {imp_nom}. Incluye {len(st.session_state.form_data['rpa_list'])} causas RPA."
+                        "Tipo_Recurso": "Extinción Art. 25 ter",
+                        "Contenido_es": f"Escrito para {imp_nom}. Incluye {len(st.session_state.form_data['rpa_list'])} causas RPA."
                     }
                     supabase.table("Gestiones").insert(registro_nube).execute()
+                    st.toast('Gestión sincronizada con GESTIONES IABL.', icon='☁️')
                 except Exception as db_err:
-                    st.warning(f"Escrito generado, pero no se pudo guardar en la nube: {db_err}")
+                    st.warning(f"Error de sincronización con la nube: {db_err}")
 
-                # Seguimos con tu lógica original de Word
+                # Generación del archivo físico Word
                 gen = GeneradorOficial(def_nom, imp_nom)
                 word_buf = gen.generar_docx(datos)
                 st.download_button("📂 Descargar Escrito Formateado (Word)", word_buf, f"Extincion_{imp_nom}.docx")
-                st.toast('Documento jurídico generado y guardado en la nube.', icon='⚖️')
                 st.success("El escrito ha sido procesado siguiendo los estándares de la Defensoría Penal Pública.")
 
     with tab2:
@@ -264,6 +265,19 @@ if check_password():
                 if email != st.session_state.auth_user:
                     if b_col4.button("🗑️", key=f"del_user_{email}"):
                         del st.session_state.usuarios_db[email]; st.rerun()
+            
+            st.divider()
+            st.subheader("Añadir Nuevo Usuario")
+            with st.form("new_user_form"):
+                new_email = st.text_input("Email")
+                new_name = st.text_input("Nombre Completo")
+                new_pw = st.text_input("Contraseña Temporal")
+                new_level = st.selectbox("Nivel", ["User", "Admin"])
+                if st.form_submit_button("Registrar Usuario"):
+                    if new_email and new_name and new_pw:
+                        st.session_state.usuarios_db[new_email] = {"nombre": new_name, "pw": new_pw, "nivel": new_level}
+                        st.success(f"Usuario {new_name} registrado.")
+                        st.rerun()
         else:
             st.warning("Acceso restringido a administradores.")
 
