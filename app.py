@@ -239,9 +239,9 @@ if check_password():
                     registro_nube = {
                         "RUC": st.session_state.form_data["ej_list"][0]['ruc'],
                         "RIT": st.session_state.form_data["ej_list"][0]['rit'],
-                        "TRIBUNAL / J": juz_ej,
-                        "Tipo_Recurso": "Extinción Art. 25 ter",
-                        "Contenido_es": f"Escrito para {imp_nom}. Incluye {len(st.session_state.form_data['rpa_list'])} causas RPA."
+                        "TRIBUNAL / JUZGADO": juz_ej,
+                        "TIPO_RECURSO": "Extinción Art. 25 ter",
+                        "CONTENIDO_ESCRITO": f"Escrito para {imp_nom}. Incluye {len(st.session_state.form_data['rpa_list'])} causas RPA."
                     }
                     supabase.table("Gestiones").insert(registro_nube).execute()
                     st.toast('Gestión sincronizada con GESTIONES IABL.', icon='☁️')
