@@ -10,3 +10,4 @@ Pillow
 librosa
 soundfile
 watchdog
+google-generativeai>=0.7.0
