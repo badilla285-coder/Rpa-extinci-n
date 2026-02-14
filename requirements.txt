@@ -1,8 +1,11 @@
 streamlit
 python-docx
 PyPDF2
-pandas
-pdf2image
-Pillow
 supabase
 google-generativeai
+SpeechRecognition
+pydub
+pandas
+Pillow
+librosa
+soundfile
