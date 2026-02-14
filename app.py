@@ -153,7 +153,6 @@ def buscar_jurisprudencia_ia(tema):
 
 def calcular_pena_rpa(pena_adulto_str):
     """Lógica simplificada de conversión Art. 21 Ley 20.084"""
-    # Esta es una aproximación lógica para la herramienta
     mapa_penas = {
         "Presidio Perpetuo": "Internación en Régimen Cerrado (5-10 años)",
         "Presidio Mayor": "Internación en Régimen Cerrado (Inf. a 5 años)",
@@ -161,13 +160,11 @@ def calcular_pena_rpa(pena_adulto_str):
         "Reclusión Menor": "Libertad Asistida Simple / Servicios en Beneficio",
         "Prisión": "Amonestación / Multa"
     }
-    
     resultado = "No determinable automáticamente. Requiere análisis del Art. 21."
     for clave, valor in mapa_penas.items():
         if clave.lower() in pena_adulto_str.lower():
             resultado = valor
             break
-            
     return resultado
 
 # =============================================================================
@@ -203,18 +200,24 @@ class GeneradorWord:
         suma_map = {
             "Extinción Art. 25 ter": "EN LO PRINCIPAL: SOLICITA EXTINCIÓN; OTROSÍ: ACOMPAÑA SENTENCIA",
             "Prescripción de la Pena": "EN LO PRINCIPAL: ALEGA PRESCRIPCIÓN; OTROSÍ: CERTIFICADO",
+            "Amparo Constitucional": "EN LO PRINCIPAL: INTERPONE ACCIÓN DE AMPARO; OTROSÍ: ORDEN DE NO INNOVAR",
+            "Apelación por Quebrantamiento": "EN LO PRINCIPAL: INTERPONE RECURSO DE APELACIÓN; OTROSÍ: NOTIFICACIÓN",
             "Minuta Control de Detención": "MINUTA DE AUDIENCIA: CONTROL DE DETENCIÓN"
         }
         titulo = suma_map.get(tipo, f"SOLICITUD: {tipo.upper()}")
         self.add_parrafo(titulo, negrita=True, align="LEFT")
         
-        self.add_parrafo(f"\nAL {datos['tribunal_ej'].upper()}", negrita=True, align="LEFT")
+        # Destinatario
+        destinatario = "ILTMA. CORTE DE APELACIONES" if tipo == "Amparo Constitucional" else datos['tribunal_ej'].upper()
+        self.add_parrafo(f"\nAL {destinatario}", negrita=True, align="LEFT")
         
+        # Comparecencia
         causas_txt = ", ".join([f"{c['rit']} (RUC {c['ruc']})" for c in datos['ejecucion'] if c['rit']])
-        intro = f"\n{{DEFENSOR}}, Abogada Defensora Penal Pública, por el adolescente {{IMPUTADO}}, en causas de ejecución {causas_txt}, a US. respetuosamente digo:"
+        intro = f"\n{{DEFENSOR}}, Abogada Defensora Penal Pública, por el adolescente {{IMPUTADO}}, en causas {causas_txt}, a US. respetuosamente digo:"
         self.add_parrafo(intro)
 
-        # --- CUERPO ESPECÍFICO ---
+        # --- CUERPO ESPECÍFICO (ARGUMENTACIÓN COMPLETA) ---
+        
         if tipo == "Extinción Art. 25 ter":
             self.add_parrafo("Que vengo en solicitar la extinción de las sanciones vigentes en virtud del art. 25 ter de la Ley 20.084, por existir condena posterior como adulto de mayor gravedad.")
             self.add_parrafo("ANTECEDENTES DE LA CONDENA ADULTO (FUNDAMENTO):", negrita=True)
@@ -223,19 +226,32 @@ class GeneradorWord:
             self.add_parrafo("POR TANTO, solicito se declare extinta la pena RPA y se deje sin efecto el saldo de condena.")
 
         elif tipo == "Prescripción de la Pena":
-            self.add_parrafo("Que vengo en solicitar se declare la prescripción de la pena conforme al artículo 100 del Código Penal y Ley 20.084.")
-            self.add_parrafo("Ha transcurrido el plazo legal desde que la sentencia quedó ejecutoriada sin que se haya completado el cumplimiento.")
-            self.add_parrafo("POR TANTO, solicito fijar audiencia para debatir el sobreseimiento definitivo.")
+            self.add_parrafo("Que vengo en solicitar se declare la prescripción de la pena conforme al artículo 100 del Código Penal y Art. 5 de la Ley 20.084.")
+            self.add_parrafo("Ha transcurrido el plazo legal desde que la sentencia quedó ejecutoriada sin que se haya completado el cumplimiento, cumpliéndose los requisitos de tiempo para la prescripción (2 años para simples delitos RPA, 5 años para crímenes).")
+            self.add_parrafo("POR TANTO, solicito fijar audiencia para debatir el sobreseimiento definitivo por prescripción.")
+
+        elif tipo == "Amparo Constitucional":
+            self.add_parrafo("Que, en virtud de lo dispuesto en el artículo 21 de la Constitución Política de la República, vengo en deducir acción constitucional de amparo en favor de mi representado, por la perturbación grave e ilegítima a su libertad personal.")
+            self.add_parrafo("HECHOS: La resolución recurrida ordenó el ingreso inmediato del joven, siendo esta ilegal y arbitraria, infringiendo el artículo 79 del Código Penal ('no podrá ejecutarse pena alguna sino en virtud de sentencia ejecutoriada').")
+            self.add_parrafo("DERECHO: Se vulnera la Convención sobre los Derechos del Niño y las Reglas de Beijing, que exigen que la privación de libertad sea la medida de 'último recurso' y por el tiempo más breve posible.")
+            self.add_parrafo("POR TANTO, SOLICITO A V.S. ILTMA. acoger el presente amparo, dejar sin efecto la resolución y ordenar la libertad inmediata.")
+            self.add_parrafo("OTROSÍ: Solicito Orden de No Innovar para suspender los efectos mientras se tramita la acción.", negrita=True)
+
+        elif tipo == "Apelación por Quebrantamiento":
+            self.add_parrafo("Que encontrándome dentro de plazo, interpongo recurso de apelación contra la resolución que declaró el quebrantamiento, solicitando sea revocada conforme a los arts. 365 CPP y 52 Ley 20.084.")
+            self.add_parrafo("AGRAVIO: La resolución causa agravio al desestimar que la privación de libertad es 'último recurso'. El incumplimiento no fue contumaz, sino derivado de factores sociales que deben ser atendidos con reinserción, no con encierro, contraviniendo el fin de la Ley RPA.")
+            self.add_parrafo("POR TANTO, SOLICITO se conceda el recurso para ante la Iltma. Corte, a fin de que revoque la resolución y mantenga la sanción en el medio libre.")
 
         elif tipo == "Minuta Control de Detención":
             self.add_parrafo("I. HECHOS DE LA DETENCIÓN:", negrita=True)
             self.add_parrafo(f"Fecha/Hora: {datos.get('fecha_det', 'N/A')}. Lugar: {datos.get('lugar_det', 'N/A')}")
-            self.add_parrafo("II. ARGUMENTOS DE ILEGALIDAD / INCIDENCIAS:", negrita=True)
+            self.add_parrafo("II. ARGUMENTOS DE DEFENSA:", negrita=True)
             for arg in datos.get('argumentos_det', []):
                 self.add_parrafo(f"• {arg}")
             self.add_parrafo("III. PETICIONES CONCRETAS:", negrita=True)
-            self.add_parrafo("Que se declare ilegal la detención por vulneración de garantías constitucionales.")
+            self.add_parrafo("1. Que se declare ilegal la detención.\n2. Que se decrete la libertad o medidas cautelares de menor intensidad.")
 
+        # --- CIERRE COMÚN ---
         self.add_parrafo("\nPOR TANTO,")
         self.add_parrafo("RUEGO A US. acceder a lo solicitado.", negrita=True)
 
@@ -275,7 +291,7 @@ def main():
     st.title(f"📄 Suite IABL: {tipo_recurso}")
     
     # --- PESTAÑAS PRINCIPALES ---
-    tab_gen, tab_tools, tab_admin = st.tabs(["📝 Generador de Escritos", "🧰 Herramientas Legales", "⚙️ Admin"])
+    tab_gen, tab_trans, tab_tools, tab_admin = st.tabs(["📝 Generador de Escritos", "🎙️ Transcriptor", "🧰 Herramientas Legales", "⚙️ Admin"])
 
     # === PESTAÑA 1: GENERADOR ===
     with tab_gen:
@@ -310,7 +326,7 @@ def main():
 
         st.markdown("---")
 
-        # Lógica Específica
+        # Lógica Específica por Recurso
         if tipo_recurso == "Extinción Art. 25 ter":
             c_rpa, c_adulto = st.columns(2)
             with c_rpa:
@@ -352,6 +368,9 @@ def main():
             args_seleccionados = st.multiselect(f"Seleccione ({tipo_args})", ARGUMENTOS_DETENCION[tipo_args])
             extra_arg = st.text_area("Argumento Adicional")
             if extra_arg: args_seleccionados.append(extra_arg)
+        
+        elif tipo_recurso in ["Amparo Constitucional", "Apelación por Quebrantamiento"]:
+            st.info(f"ℹ️ El escrito de {tipo_recurso} se generará automáticamente con la argumentación jurídica estándar y los datos de la causa ingresados arriba.")
 
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button(f"🚀 GENERAR {tipo_recurso.upper()}", type="primary", use_container_width=True):
@@ -372,7 +391,23 @@ def main():
                 st.success("✅ Generado")
                 st.download_button("📥 Descargar DOCX", doc_buffer, f"{tipo_recurso}_{st.session_state.imputado}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
 
-    # === PESTAÑA 2: HERRAMIENTAS LEGALES ===
+    # === PESTAÑA 2: TRANSCRIPTOR (RESTAURADO) ===
+    with tab_trans:
+        st.header("🎙️ Transcriptor Forense")
+        st.markdown("Sistema optimizado para audiencias judiciales.")
+        c1, c2 = st.columns(2)
+        idioma = c1.selectbox("Idioma", ["Español (Chile)", "Español (Neutro)"])
+        formato = c2.selectbox("Formato Salida", ["Transcripción Íntegra", "Resumen Jurídico"])
+        
+        audio_file = st.file_uploader("Cargar Audio (.mp3, .wav, .m4a)", type=["mp3", "wav", "m4a"])
+        if audio_file and st.button("Iniciar Transcripción (Simulación)"):
+            with st.spinner("Procesando audio con IA..."):
+                time.sleep(2) # Simula proceso
+                st.success("✅ Transcripción completada")
+                st.text_area("Resultado:", value="[00:00:00] JUEZ: Se abre la audiencia...\n[00:00:10] FISCAL: Comparece el Ministerio Público...", height=200)
+                st.info("Nota: Para transcripción real en producción se requiere habilitar el módulo de Speech-to-Text en el servidor.")
+
+    # === PESTAÑA 3: HERRAMIENTAS LEGALES ===
     with tab_tools:
         st.header("🧰 Caja de Herramientas IABL")
         
@@ -400,7 +435,7 @@ def main():
                     st.markdown(f"<div class='juris-box'>{resultado}</div>", unsafe_allow_html=True)
                     st.info("⚠️ Verifica siempre los roles citados en la página del Poder Judicial.")
 
-    # === PESTAÑA 3: ADMIN ===
+    # === PESTAÑA 4: ADMIN ===
     with tab_admin:
         st.write("Panel de Administración - Conexión Supabase")
         if supabase:
