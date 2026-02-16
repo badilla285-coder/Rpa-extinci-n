@@ -863,18 +863,41 @@ def main_app():
 
         if uploaded_audio is not None:
             if st.button("🚀 PROCESAR AUDIO CON GEMINI 1.5 FLASH"):
-                with st.spinner("🔊 Escuchando y redactando... (Esto puede tardar unos segundos)"):
+                # Usamos un contenedor vacío para mostrar el estado paso a paso
+                status_container = st.empty()
+                
+                with st.spinner("🔊 Iniciando operación..."):
                     try:
                         # 1. Guardar temporalmente
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_audio.name.split('.')[-1]}") as tmp_file:
+                        suffix = f".{uploaded_audio.name.split('.')[-1]}"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                             tmp_file.write(uploaded_audio.getvalue())
                             tmp_path = tmp_file.name
 
-                        # 2. Subir a Gemini con MIME_TYPE CORRECTO
-                        archivo_gemini = genai.upload_file(path=tmp_path, mime_type=uploaded_audio.type)
+                        # 2. Subir a Gemini
+                        status_container.info("📤 Subiendo archivo a Google AI...")
+                        # Forzamos mime_type genérico de audio para evitar errores de detección
+                        archivo_gemini = genai.upload_file(tmp_path, mime_type="audio/mp3")
+
+                        # ============================================================
+                        # BLOQUE DE SOLUCIÓN: ESPERA ACTIVA (WAIT LOOP)
+                        # ============================================================
+                        status_container.info("⏳ Google está procesando el audio. Espere un momento...")
+                        
+                        # Bucle que verifica cada 2 segundos si el audio ya está listo ("ACTIVE")
+                        while archivo_gemini.state.name == "PROCESSING":
+                            time.sleep(2)
+                            archivo_gemini = genai.get_file(archivo_gemini.name)
+
+                        if archivo_gemini.state.name == "FAILED":
+                            raise ValueError("El procesamiento del audio falló en los servidores de Google.")
+                        
+                        status_container.success("✅ Audio procesado y listo. Generando transcripción...")
+                        # ============================================================
 
                         # 3. Configurar Modelo
-                        model_transcriptor = genai.GenerativeModel('gemini-1.5-flash-001')
+                        # Usamos el nombre genérico estable
+                        model_transcriptor = genai.GenerativeModel('gemini-1.5-flash')
 
                         # 4. Prompt Exacto
                         prompt_transcripcion = """
@@ -900,7 +923,8 @@ def main_app():
                         texto_generado = response.text
 
                         # 6. Mostrar Resultados
-                        st.success("✅ Procesamiento Completado")
+                        status_container.empty() # Limpiar mensajes de estado
+                        st.success("✅ Transcripción y Recurso Generados")
                         st.subheader("📄 Resultado del Análisis")
                         st.markdown(texto_generado)
 
@@ -913,11 +937,13 @@ def main_app():
                         )
 
                     except Exception as e:
-                        st.error(f"Ocurrió un error al procesar el audio: {str(e)}")
+                        st.error(f"Ocurrió un error: {str(e)}")
                     finally:
-                        # 8. Limpieza
+                        # 8. Limpieza del archivo local
                         if 'tmp_path' in locals() and os.path.exists(tmp_path):
                             os.remove(tmp_path)
+                        # Opcional: Limpiar archivo en nube para no llenar almacenamiento
+                        # if 'archivo_gemini' in locals(): genai.delete_file(archivo_gemini.name)
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
