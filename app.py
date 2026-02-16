@@ -854,7 +854,7 @@ def main_app():
                 st.markdown("### 🧠 ESTRATEGIA DE DEFENSA (IA)")
                 st.markdown(f"<div class='teoria-box'>{teoria_ia}</div>", unsafe_allow_html=True)
 
-    # === TAB 3: TRANSCRIPTOR ===
+    # === TAB 3: TRANSCRIPTOR (ACTUALIZADO: AUTO-DETECCIÓN DE MODELO) ===
     with tabs[2]:
         st.header("🎙️ Transcriptor Forense & Generador de Recursos")
         st.info("Sube el audio de la audiencia (MP3, WAV, M4A) para obtener la transcripción literal y un borrador de recurso inteligente.")
@@ -862,88 +862,79 @@ def main_app():
         uploaded_audio = st.file_uploader("Cargar Audio de Audiencia", type=["mp3", "wav", "m4a", "ogg"])
 
         if uploaded_audio is not None:
-            if st.button("🚀 PROCESAR AUDIO CON GEMINI 1.5 FLASH"):
-                # Usamos un contenedor vacío para mostrar el estado paso a paso
+            if st.button("🚀 PROCESAR AUDIO (AUTO-DETECTAR MODELO)"):
                 status_container = st.empty()
                 
-                with st.spinner("🔊 Iniciando operación..."):
+                with st.spinner("🔄 Auto-detectando modelo y procesando..."):
                     try:
-                        # 1. Guardar temporalmente
+                        # --- PASO 0: DETECCIÓN AUTOMÁTICA DEL MODELO ---
+                        # Olvídate de poner nombres a mano. Esto busca el que funcione.
+                        modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        
+                        # Buscamos preferentemente Flash o Pro (versión 1.5 para audio)
+                        modelo_a_usar = None
+                        for m in modelos_disponibles:
+                            if 'gemini-1.5-flash' in m:
+                                modelo_a_usar = m
+                                break
+                        
+                        if not modelo_a_usar:
+                            for m in modelos_disponibles:
+                                if 'gemini-1.5-pro' in m:
+                                    modelo_a_usar = m
+                                    break
+                        
+                        # Si no encuentra específicos, usa cualquiera que tenga 1.5
+                        if not modelo_a_usar:
+                            modelo_a_usar = next((m for m in modelos_disponibles if '1.5' in m), 'models/gemini-1.5-flash')
+
+                        status_container.info(f"🤖 Modelo detectado y seleccionado: {modelo_a_usar}")
+
+                        # --- PASO 1: SUBIDA ---
                         suffix = f".{uploaded_audio.name.split('.')[-1]}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                             tmp_file.write(uploaded_audio.getvalue())
                             tmp_path = tmp_file.name
 
-                        # 2. Subir a Gemini
-                        status_container.info("📤 Subiendo archivo a Google AI...")
-                        # Forzamos mime_type genérico de audio para evitar errores de detección
                         archivo_gemini = genai.upload_file(tmp_path, mime_type="audio/mp3")
 
-                        # ============================================================
-                        # BLOQUE DE SOLUCIÓN: ESPERA ACTIVA (WAIT LOOP)
-                        # ============================================================
-                        status_container.info("⏳ Google está procesando el audio. Espere un momento...")
-                        
-                        # Bucle que verifica cada 2 segundos si el audio ya está listo ("ACTIVE")
+                        # --- PASO 2: ESPERA ACTIVA (OBLIGATORIO) ---
+                        status_container.info("⏳ Esperando procesamiento de Google...")
                         while archivo_gemini.state.name == "PROCESSING":
                             time.sleep(2)
                             archivo_gemini = genai.get_file(archivo_gemini.name)
 
                         if archivo_gemini.state.name == "FAILED":
-                            raise ValueError("El procesamiento del audio falló en los servidores de Google.")
+                            raise ValueError("Google falló al procesar el audio.")
+
+                        # --- PASO 3: GENERACIÓN ---
+                        status_container.info("📝 Redactando recurso...")
                         
-                        status_container.success("✅ Audio procesado y listo. Generando transcripción...")
-                        # ============================================================
+                        # AQUÍ USAMOS LA VARIABLE AUTOMÁTICA
+                        model_transcriptor = genai.GenerativeModel(modelo_a_usar)
 
-                        # 3. Configurar Modelo
-                        # Usamos el nombre genérico estable
-                        model_transcriptor = genai.GenerativeModel('gemini-1.5-flash')
-
-                        # 4. Prompt Exacto
                         prompt_transcripcion = """
-                        Actúa como un Estenógrafo Judicial y un Abogado Experto en Recursos Penales. Tu tarea tiene dos partes OBLIGATORIAS basadas en el audio de la audiencia:
-
-                        PARTE 1: TRANSCRIPCIÓN LITERAL COMPLETA
-                        - Transcribe TODO lo que se dice en la audiencia.
-                        - Identifica claramente a los intervinientes: JUEZ, FISCALÍA, DEFENSA, IMPUTADO.
-                        - No resumas. Quiero el debate completo, palabra por palabra.
-
-                        PARTE 2: BORRADOR DE RECURSO PROCESAL (Inteligente)
-                        - Basándote en la transcripción anterior, redacta un BORRADOR DE RECURSO (Apelación o Amparo) contra la resolución del tribunal.
-                        - ESTRUCTURA DEL RECURSO:
-                          a) La Resolución Impugnada: Cita textual de lo que resolvió el Juez.
-                          b) Argumentos de la Defensa: Retoma lo que la defensa alegó en el audio y que fue desestimado.
-                          c) Argumentos de la Fiscalía: Menciona en qué se basó la fiscalía.
-                          d) El Agravio: Explica por qué la decisión del juez es errónea frente a los argumentos de la defensa.
-                          e) Petitorio Concreto.
+                        Actúa como un Estenógrafo Judicial y Abogado Penalista.
+                        TAREA 1: Transcribe LITERALMENTE el audio (Juez, Fiscal, Defensa).
+                        TAREA 2: Redacta un BORRADOR DE RECURSO (Apelación o Amparo) detectando los vicios en el audio.
+                        Estructura: Resolución Impugnada, Argumentos Defensa, Agravio, Petitorio.
                         """
 
-                        # 5. Generar
                         response = model_transcriptor.generate_content([prompt_transcripcion, archivo_gemini])
                         texto_generado = response.text
 
-                        # 6. Mostrar Resultados
-                        status_container.empty() # Limpiar mensajes de estado
-                        st.success("✅ Transcripción y Recurso Generados")
-                        st.subheader("📄 Resultado del Análisis")
+                        # --- FINALIZACIÓN ---
+                        status_container.success("✅ ¡Listo!")
+                        st.subheader(f"📄 Resultado (Usando {modelo_a_usar})")
                         st.markdown(texto_generado)
 
-                        # 7. Botón Descarga
-                        st.download_button(
-                            label="📥 Descargar Transcripción y Recurso",
-                            data=texto_generado,
-                            file_name="Transcripcion_y_Recurso.txt",
-                            mime="text/plain"
-                        )
+                        st.download_button("📥 Descargar", texto_generado, "Recurso_Audiencia.txt")
 
                     except Exception as e:
-                        st.error(f"Ocurrió un error: {str(e)}")
+                        st.error(f"Error: {e}")
                     finally:
-                        # 8. Limpieza del archivo local
                         if 'tmp_path' in locals() and os.path.exists(tmp_path):
                             os.remove(tmp_path)
-                        # Opcional: Limpiar archivo en nube para no llenar almacenamiento
-                        # if 'archivo_gemini' in locals(): genai.delete_file(archivo_gemini.name)
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
