@@ -489,6 +489,7 @@ def login_screen():
 
         # --- LOGIN ---
         with tab_login:
+            # st.form ya permite enviar con ENTER por defecto en los campos de texto
             with st.form("login_form"):
                 email = st.text_input("Correo Electrónico")
                 password = st.text_input("Contraseña", type="password")
@@ -869,8 +870,8 @@ def main_app():
                             tmp_file.write(uploaded_audio.getvalue())
                             tmp_path = tmp_file.name
 
-                        # 2. Subir a Gemini
-                        archivo_gemini = genai.upload_file(tmp_path)
+                        # 2. Subir a Gemini con MIME_TYPE CORRECTO
+                        archivo_gemini = genai.upload_file(path=tmp_path, mime_type=uploaded_audio.type)
 
                         # 3. Configurar Modelo
                         model_transcriptor = genai.GenerativeModel('gemini-1.5-flash')
