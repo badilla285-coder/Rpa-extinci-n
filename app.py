@@ -874,7 +874,7 @@ def main_app():
                         archivo_gemini = genai.upload_file(path=tmp_path, mime_type=uploaded_audio.type)
 
                         # 3. Configurar Modelo
-                        model_transcriptor = genai.GenerativeModel('gemini-1.5-flash')
+                        model_transcriptor = genai.GenerativeModel('gemini-1.5-flash-latest')
 
                         # 4. Prompt Exacto
                         prompt_transcripcion = """
