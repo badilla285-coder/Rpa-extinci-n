@@ -152,6 +152,7 @@ except Exception as e:
 
 def get_gemini_model():
     try:
+        # Intentamos obtener el modelo más capaz disponible para multimodal
         return genai.GenerativeModel('gemini-1.5-flash')
     except:
         return genai.GenerativeModel('gemini-pro')
@@ -634,7 +635,6 @@ def calcular_pena_exacta(delito_info, atenuantes, agravantes, es_rpa):
         "badge": badge
     }
 
-# Función conservada aunque no se use en el nuevo Tab 2
 def generar_teoria_caso_ia(hechos, delito, atenuantes, es_rpa):
     contexto = "Adolescente (Ley 20.084)" if es_rpa else "Adulto"
     prompt = f"""
@@ -677,10 +677,16 @@ def main_app():
 
     st.title(f"📄 {tipo_recurso}")
     
-    # PESTAÑAS
-    tabs = st.tabs(["📝 Generador", "🧠 Analista Documental", "🎙️ Transcriptor", "👥 Admin & BD"])
+    # PESTAÑAS (Reorganizadas para incluir Biblioteca Inteligente y Admin mejorado, y recuperar Transcriptor y Analista)
+    tabs = st.tabs([
+        "📝 Generador", 
+        "🕵️ Analista Multimodal", 
+        "🎙️ Transcriptor", 
+        "📚 Biblioteca Inteligente", 
+        "⚙️ Admin & BD"
+    ])
 
-    # === TAB 1: GENERADOR ===
+    # === TAB 1: GENERADOR (RESTAURADO COMPLETO) ===
     with tabs[0]:
         st.markdown("### 1. Individualización")
         col_def, col_imp = st.columns(2)
@@ -836,49 +842,45 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-    # === TAB 2: SUPER ANALISTA DOCUMENTAL (ACD & TEORÍA DEL CASO) ===
+    # === TAB 2: ANALISTA MULTIMODAL (ACTUALIZADO: VISIÓN + MÚLTIPLES ARCHIVOS) ===
     with tabs[1]:
-        st.header("🧠 Analista Jurídico Multimodal (Documentos & Estrategia)")
-        st.info("Sube Carpetas Investigativas, Partes Policiales (incluso fotos/escaneados), Declaraciones o Peritajes.")
+        st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
+        st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
 
-        # 1. SELECCIÓN DE OBJETIVO
+        # 1. SELECCIÓN DE OBJETIVO ESTRATÉGICO
         objetivo_analisis = st.radio(
             "¿Qué buscas en estos documentos?",
             ["📄 Control de Detención (Busca ilegalidades)", 
-             "⚖️ Teoría del Caso & Prognosis (Estrategia de fondo)",
-             "🔍 Análisis Normativo/Requisitos (Salidas Alternativas)"],
+             "⚖️ Teoría del Caso (Estrategia de defensa)",
+             "🔍 Salidas Alternativas & Ejecución (Beneficios)"],
             horizontal=True
         )
 
         # 2. CARGA DE EVIDENCIA (MÚLTIPLES ARCHIVOS)
         archivos_evidencia = st.file_uploader(
-            "Cargar Evidencia (PDFs, Imágenes, Textos)", 
-            type=["pdf", "jpg", "png", "txt"], 
+            "Cargar Evidencia (PDF, JPG, PNG, TXT)", 
+            type=["pdf", "jpg", "png", "txt", "jpeg"], 
             accept_multiple_files=True
         )
 
         # 3. CONTEXTO ADICIONAL
-        contexto_usuario = st.text_area("Contexto adicional (Opcional: 'El cliente dice que no estaba ahí...')")
+        contexto_usuario = st.text_area("Contexto adicional (Ej: 'El cliente dice que Carabineros mintió...')")
 
         if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA"):
             status_box = st.empty()
-            with st.spinner("Leyendo documentos (incluso escaneados)..."):
+            with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
                 try:
-                    texto_completo_evidencia = ""
-                    
-                    # --- PROCESAMIENTO INTELIGENTE DE ARCHIVOS ---
                     docs_para_gemini = []
                     
                     for archivo in archivos_evidencia:
-                        status_box.info(f"Procesando: {archivo.name}...")
+                        status_box.info(f"Subiendo a Gemini Vision: {archivo.name}...")
                         
-                        # Guardar temporalmente
                         suffix = f".{archivo.name.split('.')[-1]}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                             tmp.write(archivo.getvalue())
                             tmp_path = tmp.name
 
-                        # SUBIR A GEMINI (Para que él lea imágenes/PDFs escaneados)
+                        # SUBIR A GEMINI (Admite imágenes, pdfs, etc.)
                         f_gemini = genai.upload_file(tmp_path)
                         
                         # Esperar procesamiento
@@ -887,72 +889,65 @@ def main_app():
                             f_gemini = genai.get_file(f_gemini.name)
                             
                         docs_para_gemini.append(f_gemini)
-                        # Limpieza local
                         os.remove(tmp_path)
 
-                    status_box.info("🧠 Analizando estrategia legal...")
+                    status_box.info("🧠 Generando estrategia jurídica...")
 
                     # --- DEFINICIÓN DE PROMPTS SEGÚN OBJETIVO ---
                     if "Control de Detención" in objetivo_analisis:
                         system_prompt = """
-                        Eres un Abogado Penalista experto en Garantías. Analiza los documentos adjuntos (Partes, Actas).
+                        Eres un Abogado Penalista experto en Garantías. Analiza la evidencia visual y textual adjunta (Partes, Actas).
                         TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
                         
                         BUSCA ESPECÍFICAMENTE:
-                        1. Indicios del Art. 85 CPP: ¿Eran suficientes? ¿O fue 'olfato policial'?
-                        2. Flagrancia (Art. 130 CPP): ¿Se cumplía la temporalidad (12 horas)?
-                        3. Lectura de Derechos: ¿Fue oportuna?
+                        1. Indicios del Art. 85 CPP: ¿Son objetivos o subjetivos?
+                        2. Flagrancia (Art. 130 CPP): Tiempos, visualización.
+                        3. Lectura de Derechos: ¿Consta en actas? ¿Hora?
                         4. Uso de la fuerza / Constatación de lesiones.
                         
-                        SALIDA ESPERADA:
-                        - Lista de Ilegalidades detectadas (con probabilidad de éxito: Alta/Media/Baja).
-                        - Argumentos sugeridos para la audiencia.
-                        - Citas legales precisas.
+                        SALIDA: Lista de ilegalidades con probabilidad de éxito y argumentos.
                         """
                     
                     elif "Teoría del Caso" in objetivo_analisis:
                         system_prompt = """
-                        Eres un Estratega de Defensa Penal.
-                        TU MISIÓN: Construir una Teoría del Caso sólida basada en la evidencia adjunta.
+                        Eres un Estratega de Defensa Penal. Analiza toda la evidencia.
+                        TU MISIÓN: Construir una Teoría del Caso.
                         
                         ANALIZA:
-                        1. Debilidades de la prueba de cargo (Fiscalía).
-                        2. Coartadas posibles o hechos exculpatorios.
-                        3. Prognosis de Pena: Calcula la pena probable (considerando atenuantes posibles).
-                        4. ¿Es posible la absolución? ¿O conviene negociar?
+                        1. Debilidades de la prueba de cargo.
+                        2. Coartadas posibles derivadas de la evidencia visual/documental.
+                        3. Prognosis de Pena: Calcula pena probable.
+                        4. ¿Absolución o Negociación?
                         """
                     
-                    else: # Analisis Normativo / Salidas
+                    else: # Salidas Alternativas
                         system_prompt = """
-                        Eres un experto en Ejecución Penal y Salidas Alternativas.
-                        TU MISIÓN: Verificar requisitos para términos anticipados o penas sustitutivas.
+                        Eres experto en Ejecución Penal y Salidas Alternativas.
+                        TU MISIÓN: Verificar viabilidad de términos anticipados.
                         
                         ANALIZA:
-                        1. ¿Cumple requisitos para Suspensión Condicional (Art. 237 CPP)? (Pena probable < 3 años, sin antecedentes).
-                        2. ¿Cumple requisitos para Acuerdo Reparatorio (Art. 241 CPP)? (Bienes jurídicos disponibles).
-                        3. ¿Procedimiento Abreviado o Simplificado? Pros y Contras.
-                        4. Ley 18.216: ¿A qué pena sustitutiva podría optar?
+                        1. Suspensión Condicional (Art. 237 CPP): Pena probable < 3 años.
+                        2. Acuerdo Reparatorio (Art. 241 CPP): Bienes disponibles.
+                        3. Procedimiento Abreviado: Requisitos y conveniencia.
+                        4. Ley 18.216: Penas sustitutivas aplicables.
                         """
 
-                    # --- LLAMADA A LA IA CON TODOS LOS ARCHIVOS ---
-                    prompt_final = [system_prompt, f"Contexto adicional del abogado: {contexto_usuario}"]
-                    prompt_final.extend(docs_para_gemini) # Le pasamos los archivos directo (Imágenes o PDFs)
+                    prompt_final = [system_prompt, f"Contexto adicional: {contexto_usuario}"]
+                    prompt_final.extend(docs_para_gemini)
 
-                    model_analist = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model_analist.generate_content(prompt_final)
+                    # Usamos el modelo configurado (Flash o Pro)
+                    response = model_ia.generate_content(prompt_final)
                     
                     status_box.success("✅ Análisis Completado")
                     
                     st.markdown("---")
                     st.markdown(response.text)
-                    
-                    # Opción de descargar el informe
-                    st.download_button("📥 Descargar Informe Estratégico", response.text, "Estrategia_Legal.txt")
+                    st.download_button("📥 Descargar Informe", response.text, "Analisis_Legal.txt")
 
                 except Exception as e:
-                    st.error(f"Error en el análisis: {e}")
+                    st.error(f"Error en el análisis multimodal: {e}")
 
-    # === TAB 3: TRANSCRIPTOR (ACTUALIZADO: AUTO-DETECCIÓN DE MODELO) ===
+    # === TAB 3: TRANSCRIPTOR (MANTENIDO) ===
     with tabs[2]:
         st.header("🎙️ Transcriptor Forense & Generador de Recursos")
         st.info("Sube el audio de la audiencia (MP3, WAV, M4A) para obtener la transcripción literal y un borrador de recurso inteligente.")
@@ -1035,22 +1030,83 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: ADMIN & BASE DE CONOCIMIENTO (JURISPRUDENCIA) ===
+    # === TAB 4: BIBLIOTECA INTELIGENTE (NUEVO: BUSCADOR LIBRE & ANÁLISIS) ===
     with tabs[3]:
-        # Verificación de Rol (Solo Admin puede subir fallos)
+        st.header("📚 Biblioteca Jurídica Inteligente")
+        
+        modo_biblio = st.radio("Herramienta", ["🔍 Buscador de Jurisprudencia", "📄 Analizar mi Escrito"], horizontal=True)
+        
+        if modo_biblio == "🔍 Buscador de Jurisprudencia":
+            st.info("Busca conceptualmente en la base de datos de fallos y leyes.")
+            query_busqueda = st.text_input("¿Qué tema jurídico necesitas investigar?", placeholder="Ej: Nulidad por entrada y registro sin orden...")
+            
+            if query_busqueda and st.button("Buscar Fallos"):
+                with st.spinner("Buscando en cerebro legal..."):
+                    try:
+                        # 1. Generar Embedding de la consulta
+                        emb_resp = genai.embed_content(
+                            model="models/text-embedding-004",
+                            content=query_busqueda,
+                            task_type="retrieval_query"
+                        )
+                        vector_consulta = emb_resp['embedding']
+                        
+                        # 2. Traer documentos (Simulación de búsqueda vectorial si no hay RPC configurada)
+                        # Nota: En producción idealmente usar supabase.rpc('match_documents', ...)
+                        # Aquí traemos una muestra para filtrar por relevancia (Python-side logic para prototipo)
+                        res = supabase.table("documentos_legales").select("*").limit(50).execute()
+                        
+                        if res.data:
+                            import numpy as np
+                            resultados = []
+                            for doc in res.data:
+                                vec_doc = doc.get('embedding')
+                                if vec_doc:
+                                    # Cálculo similitud coseno simple
+                                    sim = np.dot(vector_consulta, vec_doc) / (np.linalg.norm(vector_consulta) * np.linalg.norm(vec_doc))
+                                    resultados.append((sim, doc))
+                            
+                            # Ordenar por similitud
+                            resultados.sort(key=lambda x: x[0], reverse=True)
+                            
+                            st.subheader("Resultados Relevantes:")
+                            for sim, doc in resultados[:5]: # Top 5
+                                meta = doc['metadata']
+                                with st.expander(f"⚖️ {meta.get('tribunal','Tribunal')} - Rol: {meta.get('rol','S/N')} ({int(sim*100)}% Coincidencia)"):
+                                    st.caption(f"Tema: {meta.get('tema','General')} | Tipo: {meta.get('tipo_doc','Documento')}")
+                                    st.write(doc['contenido'][:500] + "...")
+                                    st.button("Copiar Cita", key=f"btn_{doc['id']}")
+                        else:
+                            st.warning("No hay documentos en la base de datos aún.")
+
+                    except Exception as e:
+                        st.error(f"Error en búsqueda: {e}")
+
+        else: # Analizar mi Escrito
+            st.info("Sube tu borrador. La IA extraerá conceptos y buscará jurisprudencia de apoyo.")
+            borrador = st.file_uploader("Sube tu borrador (PDF/Word/Txt)", type=["pdf","docx","txt"])
+            
+            if borrador and st.button("Analizar y Buscar Apoyo"):
+                # Lógica simplificada: Leer -> Extraer Keywords -> Buscar
+                st.success("Funcionalidad en desarrollo: Conectará tu borrador con la búsqueda vectorial mostrada arriba.")
+
+    # === TAB 5: ADMIN & CARGA (ACTUALIZADO: CLASIFICACIÓN & CHUNKING) ===
+    with tabs[4]:
         if st.session_state.user_role == "Admin":
-            st.header("🧠 Base de Conocimiento Jurídico (RAG)")
-            st.info("Aquí alimentas al sistema. Sube sentencias o leyes para que la IA las aprenda.")
+            st.header("⚙️ Cerebro Centralizado (Admin)")
+            st.info("Alimenta el sistema con Leyes y Jurisprudencia.")
 
             col_subida, col_consulta = st.columns(2)
 
-            # --- SUBIDA DE DOCUMENTOS (INGESTA) ---
             with col_subida:
-                st.subheader("1. Subir Nueva Jurisprudencia")
-                archivo_pdf = st.file_uploader("Subir Fallo (PDF)", type="pdf", key="pdf_rag")
+                st.subheader("1. Ingesta de Documentos")
+                archivo_pdf = st.file_uploader("Subir Archivo (PDF)", type="pdf", key="pdf_rag")
                 
-                meta_rol = st.text_input("Rol / RIT", placeholder="Ej: 1234-2024")
-                meta_tribunal = st.selectbox("Tribunal", ["Corte Suprema", "C. Apelaciones Santiago", "C. Apelaciones San Miguel", "TC", "Juzgado Garantía"])
+                # Clasificación de Documento
+                tipo_doc = st.selectbox("Tipo de Documento", ["Jurisprudencia (Fallo)", "Legislación (Ley/Código)", "Doctrina"])
+                
+                meta_rol = st.text_input("Rol / RIT / N° Ley", placeholder="Ej: 1234-2024")
+                meta_tribunal = st.selectbox("Tribunal / Origen", ["Corte Suprema", "C. Apelaciones Santiago", "C. Apelaciones San Miguel", "TC", "Juzgado Garantía", "Congreso Nacional"])
                 meta_etiqueta = st.text_input("Tema / Etiqueta", placeholder="Ej: Nulidad, Prisión Preventiva, 25 ter")
 
                 if archivo_pdf and st.button("💾 Guardar en Memoria"):
@@ -1062,17 +1118,15 @@ def main_app():
                             for page in reader.pages:
                                 texto_completo += page.extract_text()
                             
-                            # 2. Fragmentar texto (Chunking) para no saturar la IA
-                            # Dividimos cada 1000 caracteres aprox para búsquedas precisas
+                            # 2. Fragmentar texto (Chunking 1000 chars)
                             chunk_size = 1000
                             chunks = [texto_completo[i:i+chunk_size] for i in range(0, len(texto_completo), chunk_size)]
                             
                             st.write(f"Documento dividido en {len(chunks)} fragmentos.")
                             progress_bar = st.progress(0)
 
-                            # 3. Vectorizar y Guardar en Supabase
+                            # 3. Vectorizar y Guardar
                             for i, chunk in enumerate(chunks):
-                                # Generar Embedding con Gemini
                                 response = genai.embed_content(
                                     model="models/text-embedding-004",
                                     content=chunk,
@@ -1080,56 +1134,50 @@ def main_app():
                                 )
                                 vector = response['embedding']
 
-                                # Guardar en Supabase
                                 data_insert = {
                                     "contenido": chunk,
                                     "metadata": {
                                         "rol": meta_rol,
                                         "tribunal": meta_tribunal,
                                         "tema": meta_etiqueta,
-                                        "origen": archivo_pdf.name
+                                        "origen": archivo_pdf.name,
+                                        "tipo_doc": tipo_doc # Nueva metadata
                                     },
                                     "embedding": vector
                                 }
                                 supabase.table("documentos_legales").insert(data_insert).execute()
                                 progress_bar.progress((i + 1) / len(chunks))
                             
-                            st.success(f"✅ Fallo '{meta_rol}' indexado correctamente en la Base de Datos.")
+                            st.success(f"✅ Documento '{meta_rol}' indexado correctamente.")
                             time.sleep(2)
                             st.rerun()
 
                         except Exception as e:
                             st.error(f"Error indexando: {e}")
 
-            # --- VISTA DE DATOS ---
             with col_consulta:
-                st.subheader("2. Fallos en el Sistema")
+                st.subheader("2. Inventario Documental")
                 try:
-                    # Traemos solo metadata para no saturar (sin vector ni contenido pesado)
-                    res = supabase.table("documentos_legales").select("metadata, id").limit(10).execute()
+                    res = supabase.table("documentos_legales").select("metadata, id").limit(15).execute()
                     if res.data:
-                        # Procesamos para mostrar bonito en tabla
                         tabla_fallos = []
-                        seen_rols = set() # Para no repetir fragmentos del mismo fallo
-                        
+                        seen_rols = set()
                         for d in res.data:
                             meta = d['metadata']
                             rol = meta.get('rol', 'S/N')
                             if rol not in seen_rols:
                                 tabla_fallos.append({
+                                    "Tipo": meta.get('tipo_doc', 'N/A'),
                                     "Rol": rol,
                                     "Tribunal": meta.get('tribunal', ''),
                                     "Tema": meta.get('tema', '')
                                 })
                                 seen_rols.add(rol)
-                        
                         st.dataframe(tabla_fallos, use_container_width=True)
-                        st.caption("Mostrando últimos fallos ingresados.")
                     else:
-                        st.info("La base de datos está vacía.")
+                        st.info("Base de datos vacía.")
                 except Exception as e:
                     st.error(f"Error conexión: {e}")
-
         else:
             st.warning("🔒 Acceso restringido a Administradores.")
             st.info("Debes iniciar sesión con una cuenta autorizada.")
