@@ -135,10 +135,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 2. CONFIGURACIÓN SERVICIOS
+# 2. CONFIGURACIÓN SERVICIOS (MODIFICADO POR SEGURIDAD)
 # =============================================================================
-GOOGLE_API_KEY = "AIzaSyDjsyWjcHCXvgoIQsbyxGD2oyLHFMLfWhg" 
-genai.configure(api_key=GOOGLE_API_KEY)
+
+# === CONFIGURACIÓN SEGURA (SECRETS) ===
+try:
+    # Intenta leer la clave desde los secretos de Streamlit
+    if "GOOGLE_API_KEY" in st.secrets:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    else:
+        # Fallback para entorno local si no hay secrets.toml (opcional, o mostrar error)
+        # Nota: Para producción, SIEMPRE usar st.secrets
+        st.error("⚠️ FALTA CONFIGURAR LA API KEY EN SECRETS (GOOGLE_API_KEY).")
+except Exception as e:
+    st.error(f"⚠️ Error configurando API Key: {e}")
 
 def get_gemini_model():
     try:
@@ -868,10 +878,10 @@ def main_app():
                 with st.spinner("🔄 Auto-detectando modelo y procesando..."):
                     try:
                         # --- PASO 0: DETECCIÓN AUTOMÁTICA DEL MODELO ---
-                        # Olvídate de poner nombres a mano. Esto busca el que funcione.
+                        # Busca dinámicamente qué modelo tiene acceso a 'generateContent'
                         modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                         
-                        # Buscamos preferentemente Flash o Pro (versión 1.5 para audio)
+                        # Prioridad: Flash -> Pro -> Cualquiera 1.5
                         modelo_a_usar = None
                         for m in modelos_disponibles:
                             if 'gemini-1.5-flash' in m:
@@ -884,7 +894,6 @@ def main_app():
                                     modelo_a_usar = m
                                     break
                         
-                        # Si no encuentra específicos, usa cualquiera que tenga 1.5
                         if not modelo_a_usar:
                             modelo_a_usar = next((m for m in modelos_disponibles if '1.5' in m), 'models/gemini-1.5-flash')
 
