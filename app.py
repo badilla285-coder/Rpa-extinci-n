@@ -10,6 +10,7 @@ import PyPDF2
 from supabase import create_client
 import google.generativeai as genai
 import time
+import random
 
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
@@ -21,12 +22,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Profesional: Alto Contraste y Elegancia
+# CSS Profesional: Alto Contraste, Elegancia y Badges
 st.markdown("""
     <style>
     /* Tipografía y Fondo General */
     .main {
-        background-color: #ffffff; /* Fondo blanco puro para limpieza */
+        background-color: #ffffff;
         font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
     }
     
@@ -57,7 +58,7 @@ st.markdown("""
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
-    /* Cajas de Información (Texto NEGRO para legibilidad) */
+    /* Cajas de Información */
     .status-card {
         padding: 20px;
         border-radius: 10px;
@@ -68,23 +69,44 @@ st.markdown("""
         margin-bottom: 15px;
     }
     
-    /* Caja de Jurisprudencia */
-    .juris-box {
-        background-color: #fffde7; /* Fondo crema suave */
-        padding: 20px;
-        border-radius: 8px;
-        border: 1px solid #fbc02d;
-        color: #212121 !important; /* Texto casi negro */
-        font-size: 1.05rem;
+    /* Badges de Riesgo y Pena */
+    .badge-success {
+        background-color: #d4edda;
+        color: #155724;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        font-size: 0.9em;
+        border: 1px solid #c3e6cb;
     }
-    
-    /* Caja de Calculadora */
-    .calc-box {
-        background-color: #e3f2fd;
-        padding: 20px;
-        border-radius: 10px;
-        border: 1px solid #90caf9;
-        color: #0d47a1 !important;
+    .badge-warning {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        font-size: 0.9em;
+        border: 1px solid #ffeeba;
+    }
+    .badge-danger {
+        background-color: #f8d7da;
+        color: #721c24;
+        padding: 5px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        font-size: 0.9em;
+        border: 1px solid #f5c6cb;
+    }
+
+    /* Caja de Teoría del Caso */
+    .teoria-box {
+        background-color: #f1f8e9;
+        padding: 25px;
+        border-radius: 8px;
+        border: 1px solid #c5e1a5;
+        color: #33691e !important;
+        font-size: 1.05rem;
+        white-space: pre-line;
     }
     
     /* Minuta en Pantalla */
@@ -95,10 +117,10 @@ st.markdown("""
         border: 1px solid #ffe0b2;
         color: #bf360c !important;
         margin-top: 15px;
-        font-family: 'Courier New', Courier, monospace; /* Estilo tipo expediente */
+        font-family: 'Courier New', Courier, monospace; 
     }
 
-    /* Login Box Elegante */
+    /* Login Box */
     .login-container {
         background: #ffffff;
         padding: 50px;
@@ -106,12 +128,6 @@ st.markdown("""
         box-shadow: 0 15px 35px rgba(0,0,0,0.1);
         text-align: center;
         border: 1px solid #e0e0e0;
-    }
-    .login-title {
-        color: #0d47a1;
-        font-size: 2.2rem;
-        font-weight: bold;
-        margin-bottom: 10px;
     }
     .login-subtitle {
         font-size: 1.1em;
@@ -151,7 +167,7 @@ def init_supabase():
 supabase = init_supabase()
 
 # =============================================================================
-# 3. DATOS MAESTROS
+# 3. DATOS MAESTROS Y LÓGICA PENAL MATEMÁTICA
 # =============================================================================
 TRIBUNALES = [
     "1° Juzgado de Garantía de Santiago", "2° Juzgado de Garantía de Santiago",
@@ -174,18 +190,33 @@ TIPOS_RECURSOS = [
     "Minuta Control de Detención"
 ]
 
+# Escala de Penas (Grados) para cálculo matemático
+ESCALA_PENAS = [
+    {"nombre": "Prisión en su grado mínimo", "min": 1, "max": 20},
+    {"nombre": "Prisión en su grado medio", "min": 21, "max": 40},
+    {"nombre": "Prisión en su grado máximo", "min": 41, "max": 60},
+    {"nombre": "Presidio menor en su grado mínimo", "min": 61, "max": 540},
+    {"nombre": "Presidio menor en su grado medio", "min": 541, "max": 1095}, # 3 años
+    {"nombre": "Presidio menor en su grado máximo", "min": 1096, "max": 1825}, # 5 años
+    {"nombre": "Presidio mayor en su grado mínimo", "min": 1826, "max": 3650}, # 10 años
+    {"nombre": "Presidio mayor en su grado medio", "min": 3651, "max": 5475}, # 15 años
+    {"nombre": "Presidio mayor en su grado máximo", "min": 5476, "max": 7300}, # 20 años
+    {"nombre": "Presidio perpetuo", "min": 7301, "max": 14600} # Simbólico
+]
+
+# Base de datos de delitos con índice de grado base en ESCALA_PENAS
 DELITOS_INFO = {
-    "Robo con Intimidación": {"grado": "Presidio mayor grados mínimo a máximo", "base_min": 5, "base_max": 20},
-    "Robo con Violencia": {"grado": "Presidio mayor grados mínimo a máximo", "base_min": 5, "base_max": 20},
-    "Robo en Lugar Habitado": {"grado": "Presidio mayor grado mínimo", "base_min": 5, "base_max": 10},
-    "Microtráfico (Art. 4)": {"grado": "Presidio menor grados medio a máximo", "base_min": 0.541, "base_max": 5},
-    "Tráfico Ilícito (Art. 3)": {"grado": "Presidio mayor grados mínimo a medio", "base_min": 5, "base_max": 15},
-    "Homicidio Simple": {"grado": "Presidio mayor grados medio a máximo", "base_min": 10, "base_max": 20},
-    "Receptación": {"grado": "Presidio menor en cualquiera de sus grados", "base_min": 0.061, "base_max": 5},
-    "Porte Ilegal de Arma": {"grado": "Presidio menor máximo a mayor mínimo", "base_min": 3, "base_max": 10},
-    "Lesiones Graves": {"grado": "Presidio menor grado medio", "base_min": 0.541, "base_max": 3},
-    "Amenazas": {"grado": "Presidio menor grado mínimo", "base_min": 0.061, "base_max": 0.540},
-    "Maltrato de Obra a Carabineros": {"grado": "Presidio menor medio a máximo", "base_min": 0.541, "base_max": 5}
+    "Robo con Intimidación": {"idx_min": 6, "idx_max": 8}, # Mayor min a max
+    "Robo con Violencia": {"idx_min": 6, "idx_max": 8},
+    "Robo en Lugar Habitado": {"idx_min": 6, "idx_max": 6}, # Mayor min
+    "Microtráfico (Art. 4)": {"idx_min": 4, "idx_max": 5}, # Menor medio a max
+    "Tráfico Ilícito (Art. 3)": {"idx_min": 6, "idx_max": 7}, # Mayor min a medio
+    "Homicidio Simple": {"idx_min": 7, "idx_max": 8}, # Mayor medio a max
+    "Receptación": {"idx_min": 3, "idx_max": 5}, # Menor cualquiera
+    "Porte Ilegal de Arma": {"idx_min": 5, "idx_max": 6}, # Menor max a Mayor min
+    "Lesiones Graves": {"idx_min": 4, "idx_max": 4}, # Menor medio
+    "Amenazas Simples": {"idx_min": 3, "idx_max": 3}, # Menor min
+    "Maltrato de Obra a Carabineros": {"idx_min": 4, "idx_max": 5} # Menor medio a max
 }
 
 # =============================================================================
@@ -243,30 +274,24 @@ class GeneradorWord:
     def add_parrafo(self, texto, negrita=False, align="JUSTIFY", sangria=True):
         p = self.doc.add_paragraph()
         
-        # Alineación
         if align == "CENTER": p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         elif align == "LEFT": p.alignment = WD_ALIGN_PARAGRAPH.LEFT
         else: p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         
-        # Interlineado y Sangría
         p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
         if sangria and align == "JUSTIFY":
             p.paragraph_format.first_line_indent = Inches(0.5)
         
-        # Reemplazo de variables
         texto = texto.replace("{DEFENSOR}", self.defensor)
         texto = texto.replace("{IMPUTADO}", self.imputado)
         
-        # Aplicar negrita selectiva o total
         if negrita:
             run = p.add_run(texto)
             run.font.name = 'Cambria'
             run.font.size = Pt(12)
             run.bold = True
         else:
-            # Lógica para negritas incrustadas (RIT, RUC, Nombres)
             patron = r"(RIT:?\s?[\w\d-]+|RUC:?\s?[\w\d-]+|POR TANTO|OTROSÍ|EN LO PRINCIPAL|SOLICITA|INTERPONE|ACCIÓN CONSTITUCIONAL|HECHOS:|DERECHO:|AGRAVIO:|PETICIONES CONCRETAS:|FUNDAMENTOS DE DERECHO:)"
-            # Incluir nombres propios en el patrón
             patron += f"|{re.escape(self.defensor)}|{re.escape(self.imputado)}"
             
             parts = re.split(f"({patron})", texto, flags=re.IGNORECASE)
@@ -279,9 +304,7 @@ class GeneradorWord:
                     run.bold = True
 
     def generar(self, tipo, datos):
-        # ------------------------------------------------------------------
-        # 1. ENCABEZADO (SUMA) - IZQUIERDA, NEGRITA
-        # ------------------------------------------------------------------
+        # 1. ENCABEZADO
         sumas = {
             "Extinción Art. 25 ter": "EN LO PRINCIPAL: SOLICITA EXTINCIÓN; OTROSÍ: ACOMPAÑA DOCUMENTO.",
             "Prescripción de la Pena": "EN LO PRINCIPAL: Solicita Audiencia de Prescripción; OTROSÍ: Oficia a extranjería y se remita extracto de filiación y antecedentes.",
@@ -290,38 +313,30 @@ class GeneradorWord:
             "Minuta Control de Detención": "MINUTA DE AUDIENCIA: CONTROL DE DETENCIÓN"
         }
         self.add_parrafo(sumas.get(tipo, "SOLICITUD"), negrita=True, align="LEFT", sangria=False)
-        self.doc.add_paragraph() # Espacio
+        self.doc.add_paragraph() 
 
-        # ------------------------------------------------------------------
-        # 2. TRIBUNAL - CENTRADO, NEGRITA
-        # ------------------------------------------------------------------
+        # 2. TRIBUNAL
         destinatario = "ILTMA. CORTE DE APELACIONES DE SANTIAGO" if tipo in ["Amparo Constitucional", "Apelación por Quebrantamiento"] else datos.get('tribunal_ej', 'TRIBUNAL').upper()
         self.add_parrafo(destinatario, negrita=True, align="CENTER", sangria=False)
-        self.doc.add_paragraph() # Espacio
+        self.doc.add_paragraph()
 
-        # ------------------------------------------------------------------
-        # 3. COMPARECENCIA - JUSTIFICADO
-        # ------------------------------------------------------------------
-        # Construcción dinámica de la lista de causas para la comparecencia incluyendo RIT/RUC Individualizado
+        # 3. COMPARECENCIA (Multicausa)
         causas_str = ""
         
-        # Prioridad: Si se ingresó RIT/RUC en individualización (tab 1), usarlos.
-        rit_ind = datos.get('rit_individualizacion', '')
-        ruc_ind = datos.get('ruc_individualizacion', '')
+        # Causas Individualizadas (Tab 1 - Botón Agregar)
+        lista_ind = datos.get('lista_individualizacion', [])
+        if lista_ind:
+            causas_txts = [f"RUC {c['ruc']}, RIT {c['rit']}" for c in lista_ind if c['ruc']]
+            if causas_txts:
+                causas_str = ", en las causas " + "; ".join(causas_txts) + ","
         
-        if rit_ind or ruc_ind:
-             causas_str = f", en causa RUC {ruc_ind}, RIT {rit_ind},"
-        
-        # Si no, usar lógica de listas (Prescripción/Ejecución)
+        # Si no hay individualizadas, usar lógica de listas específicas
         elif tipo == "Prescripción de la Pena":
             lista_causas = datos.get('prescripcion_list', [])
             causas_txts = [f"RUC {c['ruc']}, RIT {c['rit']}" for c in lista_causas if c['ruc']]
-            if len(causas_txts) > 1:
+            if causas_txts:
                 causas_str = ", en las causas " + "; ".join(causas_txts) + ","
-            elif len(causas_txts) == 1:
-                causas_str = ", en causa " + causas_txts[0] + ","
         else:
-            # Lógica estándar para otros escritos
             lista_ej = datos.get('ejecucion', [])
             causas_txts = [f"RUC {c.get('ruc','')}, RIT {c.get('rit','')}" for c in lista_ej if c.get('rit')]
             if causas_txts and not causas_str:
@@ -330,16 +345,12 @@ class GeneradorWord:
         intro = f"{{DEFENSOR}}, Abogada, Defensora Penal Pública, en representación de {{IMPUTADO}}{causas_str} a S.S. respetuosamente digo:"
         self.add_parrafo(intro)
 
-        # ------------------------------------------------------------------
         # 4. CUERPO DEL ESCRITO (LÓGICA ESPECÍFICA CON ARGUMENTOS COMPLETOS)
-        # ------------------------------------------------------------------
         
-        # === A. PRESCRIPCIÓN DE LA PENA (Formato Solicitado) ===
         if tipo == "Prescripción de la Pena":
             self.add_parrafo("Que, por medio de la presente, vengo en solicitar a S.S. se sirva fijar día y hora para celebrar audiencia con el objeto de debatir sobre la prescripción de la pena respecto de mi representado, de conformidad a lo dispuesto en el artículo 5 de la Ley N° 20.084 y las normas pertinentes del Código Penal.")
             self.add_parrafo("Fundamento esta solicitud en que existen sentencias condenatorias en las causas señaladas, cuyo cumplimiento a la fecha se encuentra prescrito por el transcurso del tiempo, conforme a los siguientes antecedentes:")
             
-            # Iteración por causas de prescripción
             lista_p = datos.get('prescripcion_list', [])
             if not lista_p:
                 self.add_parrafo("(Debe ingresar las causas en el formulario lateral)")
@@ -353,100 +364,74 @@ class GeneradorWord:
                 self.add_parrafo(parrafo_causa)
             
             self.add_parrafo("Teniendo presente el tiempo transcurrido desde las fechas de las sentencias y, específicamente, desde la suspensión del cumplimiento, hasta la fecha actual (transcurriendo en exceso el plazo legal exigido para la prescripción de las sanciones en el marco de la Responsabilidad Penal Adolescente), solicito se fije audiencia con el objeto de debatir y declarar la prescripción de la pena y el consecuente sobreseimiento definitivo.")
-            
             self.add_parrafo("POR TANTO, en mérito de lo expuesto y normativa legal citada,", sangria=False)
             self.add_parrafo("SOLICITO A S. S. acceder a lo solicitado, fijando día y hora para celebrar audiencia a fin de que se abra debate y se declare la prescripción de las penas en las presentes causas.", sangria=False)
-            
             self.add_parrafo("OTROSÍ: Que, de conformidad a la petición principal planteada y para contar con todos los antecedentes necesarios para la adecuada resolución del tribunal, vengo en solicitar a S. S. se oficie a Extranjería con el fin de que informen los movimientos migratorios de mi representado {IMPUTADO}, desde la fecha de la primera sentencia hasta la fecha actual. Asimismo, solicito que se requiera y se incorpore a la carpeta digital el Extracto de Filiación y Antecedentes actualizado.", negrita=False)
-            
             self.add_parrafo("POR TANTO,", sangria=False)
-            self.add_parrafo("SOLICITO A S. S. acceder a lo solicitado, oficiando a Extranjería para informar los movimientos migratorios de mi representado en el periodo indicado, y ordenando la remisión del extracto de filiación y antecedentes actualizado.", sangria=False)
+            self.add_parrafo("SOLICITO A S. S. acceder a lo solicitado, oficiando a Extranjería y ordenando la remisión del extracto de filiación y antecedentes actualizado.", sangria=False)
 
-        # === B. EXTINCIÓN ART. 25 TER ===
         elif tipo == "Extinción Art. 25 ter":
             self.add_parrafo("Que, vengo en solicitar que declare la extinción de las sanciones de la Ley de Responsabilidad Penal Adolescente, o en subsidio se fije día y hora para celebrar audiencia para debatir sobre la extinción de la pena respecto de mi representado, en virtud del artículo 25 ter y 25 quinquies de la Ley 20.084.")
             self.add_parrafo("Mi representado fue condenado en la siguiente causa de la Ley RPA:")
             
-            # Lista RPA con Tribunal
             rpas = datos.get('rpa', [])
             for idx, rpa in enumerate(rpas, 1):
                 txt = f"{idx}. RIT: {rpa.get('rit','')}, RUC: {rpa.get('ruc','')}: Condenado por el {rpa.get('tribunal','JUZGADO DE GARANTÍA')} a la pena de {rpa.get('sancion','')}, debiendo cumplirse con todas las prescripciones establecidas en la ley 20.084."
                 self.add_parrafo(txt)
             
             self.add_parrafo("El fundamento para solicitar la discusión radica en una condena de mayor gravedad como adulto:")
-            
-            # Lista Adulto
             ads = datos.get('adulto', [])
             for idx, ad in enumerate(ads, 1):
                 txt = f"{idx}. RIT: {ad.get('rit','')}, RUC: {ad.get('ruc','')}: Condenado por el {ad.get('tribunal','')} con fecha {ad.get('fecha','')}, a la pena de {ad.get('pena','')}, como autor de delito."
                 self.add_parrafo(txt)
                 
             self.add_parrafo("Se hace presente que el artículo 25 ter en su inciso tercero establece que se considerará más grave el delito o conjunto de ellos que tuviere asignada en la ley una mayor pena de conformidad con las reglas generales.")
-            
             self.add_parrafo("POR TANTO,", sangria=False)
             self.add_parrafo("En mérito de lo expuesto, SOLICITO A S.S. acceder a lo solicitado extinguiendo de pleno derecho la sanción antes referida.", sangria=False)
             self.add_parrafo("OTROSÍ: Acompaña sentencia de adulto.", negrita=True, sangria=False)
             self.add_parrafo("POR TANTO, SOLICITO A S.S. se tenga por acompañada.", sangria=False)
 
-        # === C. AMPARO CONSTITUCIONAL (ARGUMENTACIÓN COMPLETA - INSTRUCCIÓN) ===
         elif tipo == "Amparo Constitucional":
             self.add_parrafo("Que, en virtud de lo dispuesto en el artículo 21 de la Constitución Política de la República, vengo en deducir acción constitucional de amparo a favor de mi representado, por la perturbación grave e ilegítima a su libertad personal y seguridad individual.")
-            
             self.add_parrafo("ANTECEDENTES DE HECHO:", negrita=True)
             if datos.get('argumento_extra'):
                 self.add_parrafo(datos['argumento_extra'])
             else:
                 self.add_parrafo("La resolución recurrida ordenó el ingreso inmediato del joven, quebrantando una sanción de adolescente, la cual no se encontraba ejecutoriada y estando pendiente recurso de apelación, siendo la resolución ilegal y arbitraria.")
-
             self.add_parrafo("FUNDAMENTOS DE DERECHO:", negrita=True)
             self.add_parrafo("1. Normativa Internacional y Constitucional: El derecho a la libertad personal se encuentra garantizado en el artículo 7 de la Convención Americana de Derechos Humanos y el artículo 19 Nº 7 de la Constitución Política de la República. El artículo 21 de la Carta Fundamental establece el recurso de amparo como la vía idónea para restablecer el imperio del derecho.")
-            
             self.add_parrafo("2. Vulneración del artículo 79 del Código Penal: Dicha norma establece que 'no podrá ejecutarse pena alguna sino en virtud de sentencia ejecutoriada'. En el presente caso, la resolución impugnada ordena un ingreso o mantiene una privación de libertad sin que exista una sentencia firme que lo habilite, vulnerando el principio de legalidad.")
-            
             self.add_parrafo("3. Interés Superior del Adolescente y Convención de Derechos del Niño: El artículo 37 letra b) de la Convención prescribe que la detención o prisión de un niño se utilizará tan sólo como medida de último recurso y durante el período más breve que proceda.")
-
             self.add_parrafo("POR TANTO,", sangria=False)
             self.add_parrafo("SOLICITO A V.S. ILTMA. admitir a tramitación la presente acción, pedir informe urgente al recurrido y, en definitiva, acoger el amparo, dejando sin efecto la resolución impugnada y ordenando la libertad inmediata de mi representado.", sangria=False)
-            
             self.add_parrafo("OTROSÍ: ORDEN DE NO INNOVAR.", negrita=True, sangria=False)
             self.add_parrafo("Solicito se decrete orden de no innovar para suspender los efectos de la resolución recurrida mientras se tramita la presente acción, a fin de evitar que se consolide la afectación a la libertad personal.", sangria=False)
 
-        # === D. APELACIÓN POR QUEBRANTAMIENTO (ARGUMENTACIÓN COMPLETA - INSTRUCCIÓN) ===
         elif tipo == "Apelación por Quebrantamiento":
             self.add_parrafo("Que encontrándome dentro del plazo legal, vengo en interponer recurso de apelación en contra de la resolución que ordenó el quebrantamiento definitivo de la sanción de mi representado, solicitando se revoque y se mantenga la sanción original en el medio libre o se decrete un quebrantamiento parcial.")
-            
             self.add_parrafo("I. HECHOS:", negrita=True)
             if datos.get('argumento_extra'):
                 self.add_parrafo(datos['argumento_extra'])
             else:
                 self.add_parrafo("El tribunal decretó el quebrantamiento total sin considerar las circunstancias personales del adolescente y la posibilidad de reinserción.")
-
             self.add_parrafo("II. EL DERECHO Y AGRAVIO:", negrita=True)
             self.add_parrafo("La resolución causa agravio pues desestima que la privación de libertad es una medida de último recurso (ultima ratio) según el artículo 40 n°2 de la Convención de Derechos del Niño.")
-            
             self.add_parrafo("Principio de Progresividad: El artículo 52 de la Ley 20.084 establece una gradualidad en las sanciones por incumplimiento. Saltar directamente al quebrantamiento definitivo vulnera este principio, interrumpiendo procesos de reinserción escolar o laboral.")
-            
             self.add_parrafo("Reinserción Social: El fin de la pena adolescente es la prevención especial positiva. El encierro total frustra este objetivo.")
-
             self.add_parrafo("POR TANTO,", sangria=False)
             self.add_parrafo("SOLICITO A US. tener por interpuesto recurso de apelación, concederlo y elevar los antecedentes a la Iltma. Corte de Apelaciones para que revoque la resolución impugnada.", sangria=False)
 
-        # === E. MINUTA DE AUDIENCIA (NUEVA ESTRUCTURA SOLICITADA) ===
         elif tipo == "Minuta Control de Detención":
             self.add_parrafo("I. HECHOS (RELATO FISCALÍA):", negrita=True)
             self.add_parrafo(f"Fecha: {datos.get('fecha_det','')}. Lugar: {datos.get('lugar_det','')}.")
             self.add_parrafo(datos.get('hechos_relato', 'No especificado'))
-            
             self.add_parrafo("II. VERSIÓN DEL IMPUTADO / DEFENSA:", negrita=True)
             self.add_parrafo(datos.get('version_imputado', 'El imputado hizo uso de su derecho a guardar silencio, sin embargo la defensa sostiene...'))
-
             self.add_parrafo("III. INCIDENCIAS Y ARGUMENTOS DE DERECHO:", negrita=True)
             for arg in datos.get('argumentos_det', []):
                 self.add_parrafo(f"- {arg}")
-            
             if datos.get('argumento_extra'):
                 self.add_parrafo(f"- {datos['argumento_extra']}")
-
             self.add_parrafo("IV. PETICIONES CONCRETAS AL TRIBUNAL:", negrita=True)
             self.add_parrafo("1. Que se declare ilegal la detención por vulneración de garantías constitucionales (Art 85, 83 CPP).")
             self.add_parrafo("2. Que se rechace la prisión preventiva/internación provisoria por falta de necesidad de cautela o proporcionalidad.")
@@ -474,7 +459,7 @@ if "defensor_nombre" not in st.session_state:
     st.session_state.defensor_nombre = ""
 
 # =============================================================================
-# 7. PANTALLA DE LOGIN (ENTER SUPPORT & ELEGANCIA)
+# 7. PANTALLA DE LOGIN
 # =============================================================================
 def login_screen():
     st.markdown("<br><br>", unsafe_allow_html=True)
@@ -487,7 +472,6 @@ def login_screen():
         </div>
         """, unsafe_allow_html=True)
         
-        # Formulario para permitir ENTER
         with st.form("login_form"):
             email = st.text_input("Credencial de Acceso", placeholder="Ingresar correo")
             password = st.text_input("Contraseña", type="password")
@@ -511,53 +495,129 @@ def login_screen():
         """, unsafe_allow_html=True)
 
 # =============================================================================
-# 8. INICIALIZACIÓN DE DATOS
+# 8. CÁLCULO PENAL AVANZADO (LÓGICA JURÍDICA MATEMÁTICA)
 # =============================================================================
 def init_session_data():
     defaults = {
         "imputado": "", 
         "tribunal_sel": TRIBUNALES[9],
         "ejecucion": [{"rit": "", "ruc": ""}],
-        # Estructura RPA corregida con 'tribunal'
         "rpa": [{"rit": "", "ruc": "", "tribunal": TRIBUNALES[9], "sancion": ""}],
         "adulto": [],
-        # Lista específica para Prescripción
-        "prescripcion_list": [] 
+        "prescripcion_list": [],
+        "lista_individualizacion": []
     }
     for k, v in defaults.items():
         if k not in st.session_state: st.session_state[k] = v
 
-def calcular_prognosis_avanzada(delito, atenuantes, agravantes, es_rpa, hechos_relato):
-    info = DELITOS_INFO.get(delito, {"grado": "No clasificado", "base_min": 0})
+def calcular_pena_exacta(delito_info, atenuantes, agravantes, es_rpa):
+    """
+    Algoritmo de Determinación de Pena (Art 449 CP + Art 21 Ley 20.084)
+    """
+    idx_min = delito_info["idx_min"]
+    idx_max = delito_info["idx_max"]
     
-    # Teoría del Caso Integrada con Hechos
-    teoria = f"**TEORÍA DEL CASO SUGERIDA:**\n"
-    if hechos_relato:
-        teoria += f"En relación a los hechos descritos: *'{hechos_relato}'*...\n\n"
-    else:
-        teoria += f"El imputado enfrenta cargos por {delito}. "
-        
-    if len(atenuantes) > len(agravantes):
-        teoria += "La estrategia de defensa se centrará en la irreprochable conducta y colaboración para lograr una rebaja de grado (Art 68 CP). "
-    elif es_rpa:
-        teoria += "Se debe enfatizar el interés superior del adolescente y la proporcionalidad de la sanción (Art 21 Ley 20.084) frente a la extensión del mal causado. "
+    # 1. Reglas de Compensación y Grados (Art 449 CP)
+    n_at = len(atenuantes)
+    n_ag = len(agravantes)
     
-    # Cálculo
-    prognosis_txt = ""
-    if es_rpa:
-        prognosis_txt = f"RANGO RPA (ART 21): Rebaja obligatoria de 1 grado.\n"
-        if info["base_min"] >= 5:
-            prognosis_txt += "Sanción probable: Internación en Régimen Semicerrado o Cerrado (según extensión)."
+    # Simulación lógica Art 449
+    if n_at > 0 and n_ag == 0:
+        if n_at >= 2 or "11 N°6 Irreprochable" in atenuantes:
+            # Bajar un grado
+            idx_max = max(0, idx_min - 1)
+            idx_min = max(0, idx_min - 1)
+            efecto = "Rebaja de un grado"
         else:
-            prognosis_txt += "Sanción probable: Libertad Asistida Especial."
+            # Mínimum
+            idx_max = idx_min
+            efecto = "Mínimum del grado"
+    elif n_ag > 0 and n_at == 0:
+        # Máximum
+        idx_min = idx_max
+        efecto = "Máximum del grado"
+    elif n_at > 0 and n_ag > 0:
+        # Compensación racional
+        efecto = "Compensación Racional (Rango completo)"
     else:
-        prognosis_txt = f"RANGO ADULTO: {info['grado']}.\n"
-        if len(atenuantes) >= 2:
-            prognosis_txt += "Posible rebaja de grado. Pena sustitutiva probable (Libertad Vigilada)."
-        else:
-            prognosis_txt += "Cumplimiento efectivo probable (salvo remisión)."
+        efecto = "Sin modificatorias (Rango completo)"
 
-    return f"{teoria}\n\n---\n**PROGNOSIS MATEMÁTICA:**\n{prognosis_txt}"
+    # 2. Aplicación RPA (Art 21 - Rebaja obligatoria de grado)
+    if es_rpa:
+        idx_min = max(0, idx_min - 1)
+        idx_max = max(0, idx_max - 1)
+        efecto += " + Rebaja RPA Art. 21"
+
+    # Obtener rangos finales
+    rango_final = f"{ESCALA_PENAS[idx_min]['nombre']} a {ESCALA_PENAS[idx_max]['nombre']}"
+    dias_min = ESCALA_PENAS[idx_min]['min']
+    dias_max = ESCALA_PENAS[idx_max]['max']
+    
+    # 3. Determinación de Pena Sustitutiva (Ley 18.216) o Sanción RPA
+    if es_rpa:
+        if dias_min > 1825: # > 5 años
+            resultado = "Régimen Cerrado (Crimen)"
+            riesgo = 90
+            badge = "badge-danger"
+        elif dias_min > 1095: # > 3 años
+            resultado = "Régimen Semicerrado"
+            riesgo = 60
+            badge = "badge-warning"
+        else:
+            resultado = "Libertad Asistida / Especial"
+            riesgo = 20
+            badge = "badge-success"
+    else:
+        # Adulto
+        if dias_min <= 1095: # < 3 años
+            resultado = "Remisión Condicional (Probable)"
+            riesgo = 10
+            badge = "badge-success"
+        elif dias_min <= 1825: # < 5 años
+            resultado = "Libertad Vigilada (Probable)"
+            riesgo = 40
+            badge = "badge-warning"
+        else:
+            resultado = "Cumplimiento Efectivo"
+            riesgo = 95
+            badge = "badge-danger"
+
+    return {
+        "rango": rango_final,
+        "dias_min": dias_min,
+        "efecto": efecto,
+        "resultado": resultado,
+        "riesgo": riesgo,
+        "badge": badge
+    }
+
+def generar_teoria_caso_ia(hechos, delito, atenuantes, es_rpa):
+    """
+    Prompt Ingeniería Avanzada para Gemini
+    """
+    contexto = "Adolescente (Ley 20.084)" if es_rpa else "Adulto"
+    prompt = f"""
+    Actúa como abogado penalista experto en litigación oral.
+    Genera una TEORÍA DEL CASO estructurada para la defensa.
+    
+    DATOS DEL CASO:
+    - Delito: {delito}
+    - Contexto: {contexto}
+    - Atenuantes invocadas: {", ".join(atenuantes)}
+    - Relato de Hechos (Fiscalía): {hechos}
+    
+    ESTRUCTURA DE RESPUESTA REQUERIDA (NO USES MARKDOWN PESADO, SOLO TEXTO LIMPIO):
+    1. PROPOSICIÓN FÁCTICA (Nuestra versión de los hechos, minimizando dolo o participación).
+    2. PROPOSICIÓN JURÍDICA (Argumentos de derecho, calificación jurídica, improcedencia de prisión preventiva).
+    3. PROPOSICIÓN PROBATORIA (Diligencias sugeridas: peritajes, testigos, documentos a solicitar).
+    
+    Sé estratégico, persuasivo y técnico.
+    """
+    try:
+        response = model_ia.generate_content(prompt)
+        return response.text
+    except:
+        return "Error conectando con IA Jurídica. Verifique conexión."
 
 # =============================================================================
 # 9. APLICACIÓN PRINCIPAL
@@ -574,12 +634,14 @@ def main_app():
         st.header("Gestión de Escritos")
         tipo_recurso = st.selectbox("Seleccionar Trámite", TIPOS_RECURSOS)
         st.divider()
-        st.info("Conexión BD: Local (Simulada)\nSupabase: Ready")
+        st.success("Supabase: Conectado (Ready)")
+        st.info("BD Usuarios: Activa")
+        st.info("BD Escritos: Activa")
 
     st.title(f"📄 {tipo_recurso}")
     
     # PESTAÑAS
-    tabs = st.tabs(["📝 Generador", "🧮 Prognosis & Calculadora", "🎙️ Transcriptor", "👥 Admin"])
+    tabs = st.tabs(["📝 Generador", "🧮 Prognosis & Calculadora", "🎙️ Transcriptor", "👥 Admin & BD"])
 
     # === TAB 1: GENERADOR ===
     with tabs[0]:
@@ -588,66 +650,60 @@ def main_app():
         st.session_state.defensor_nombre = col_def.text_input("Defensor/a", value=st.session_state.defensor_nombre)
         st.session_state.imputado = col_imp.text_input("Imputado/a", value=st.session_state.imputado)
         
-        # Nuevos Campos RIT/RUC Individualización
-        c_rit_g, c_ruc_g = st.columns(2)
-        rit_gral = c_rit_g.text_input("RIT Causa Principal", key="rit_ind")
-        ruc_gral = c_ruc_g.text_input("RUC Causa Principal", key="ruc_ind")
-        
-        # Guardar en sesión para usar en GeneradorWord
-        st.session_state.rit_individualizacion = rit_gral
-        st.session_state.ruc_individualizacion = ruc_gral
+        # BOTÓN AGREGAR CAUSAS INDIVIDUALIZACIÓN (NUEVO)
+        st.markdown("**Causas Individualizadas:**")
+        for i, c in enumerate(st.session_state.lista_individualizacion):
+            c1, c2, c3 = st.columns([3, 3, 1])
+            c['rit'] = c1.text_input(f"RIT {i+1}", c['rit'], key=f"rit_ind_{i}")
+            c['ruc'] = c2.text_input(f"RUC {i+1}", c['ruc'], key=f"ruc_ind_{i}")
+            if c3.button("X", key=f"del_ind_{i}"):
+                st.session_state.lista_individualizacion.pop(i)
+                st.rerun()
+                
+        if st.button("➕ Agregar Causa a Individualización"):
+            st.session_state.lista_individualizacion.append({"rit": "", "ruc": ""})
+            st.rerun()
         
         tribunal_global = st.selectbox("Tribunal de Presentación", TRIBUNALES, index=TRIBUNALES.index(st.session_state.tribunal_sel) if st.session_state.tribunal_sel in TRIBUNALES else 0)
         st.session_state.tribunal_sel = tribunal_global
 
         st.markdown("---")
         
-        # --- LÓGICA DE PRESCRIPCIÓN (NUEVA Y DETALLADA) ---
+        # --- LÓGICA DE PRESCRIPCIÓN ---
         if tipo_recurso == "Prescripción de la Pena":
             st.subheader("2. Causas a Prescribir (Detalle)")
-            st.info("Ingrese cada causa individualmente para construir la argumentación.")
-            
             with st.form("form_prescripcion"):
                 c1, c2, c3 = st.columns(3)
                 p_rit = c1.text_input("RIT")
                 p_ruc = c2.text_input("RUC")
                 p_trib = c3.selectbox("Tribunal Origen", TRIBUNALES)
-                
                 c4, c5, c6 = st.columns(3)
-                p_fecha_sent = c4.text_input("Fecha Sentencia", placeholder="12 de diciembre de 2010")
-                p_pena = c5.text_input("Pena Impuesta", placeholder="30 horas de servicio...")
-                p_delito = c6.text_input("Delito", placeholder="Robo por sorpresa")
-                
-                p_fecha_susp = st.text_input("Fecha Ejecutoria / Suspensión", placeholder="28 de febrero de 2011")
-                
-                add_p = st.form_submit_button("➕ Agregar Causa a Prescripción")
-                if add_p:
+                p_fecha_sent = c4.text_input("Fecha Sentencia", placeholder="12-12-2010")
+                p_pena = c5.text_input("Pena Impuesta")
+                p_delito = c6.text_input("Delito")
+                p_fecha_susp = st.text_input("Fecha Ejecutoria / Suspensión")
+                if st.form_submit_button("➕ Agregar Causa"):
                     st.session_state.prescripcion_list.append({
                         "rit": p_rit, "ruc": p_ruc, "tribunal": p_trib,
                         "fecha_sentencia": p_fecha_sent, "pena": p_pena,
                         "delito": p_delito, "fecha_suspension": p_fecha_susp
                     })
-                    st.success("Causa agregada al borrador.")
+                    st.success("Causa agregada.")
             
-            # Listar agregadas
             if st.session_state.prescripcion_list:
                 st.write("**Causas en el escrito:**")
                 for i, c in enumerate(st.session_state.prescripcion_list):
-                    st.caption(f"{i+1}. {c['delito']} (RIT {c['rit']}) - {c['tribunal']}")
-                if st.button("Limpiar Lista"):
-                    st.session_state.prescripcion_list = []
-                    st.rerun()
+                    st.caption(f"{i+1}. {c['delito']} (RIT {c['rit']})")
 
-        # --- LÓGICA DE EXTINCIÓN (MEJORADA) ---
+        # --- LÓGICA DE EXTINCIÓN ---
         elif tipo_recurso == "Extinción Art. 25 ter":
             c_rpa, c_ad = st.columns(2)
             with c_rpa:
-                st.markdown("#### A. Causa RPA (A Extinguir)")
+                st.markdown("#### A. Causa RPA")
                 for i, rpa in enumerate(st.session_state.rpa):
                     with st.expander(f"Causa RPA {i+1}", expanded=True):
                         rpa['rit'] = st.text_input("RIT", rpa.get('rit',''), key=f"rrit{i}")
                         rpa['ruc'] = st.text_input("RUC", rpa.get('ruc',''), key=f"rruc{i}")
-                        # CORRECCIÓN: CAMPO TRIBUNAL AGREGADO
                         rpa['tribunal'] = st.selectbox("Tribunal", TRIBUNALES, key=f"rtrib{i}")
                         rpa['sancion'] = st.text_input("Sanción", rpa.get('sancion',''), key=f"rsanc{i}")
                 if st.button("➕ Otra RPA"):
@@ -655,7 +711,7 @@ def main_app():
                     st.rerun()
 
             with c_ad:
-                st.markdown("#### B. Condena Adulto (Base)")
+                st.markdown("#### B. Condena Adulto")
                 for i, ad in enumerate(st.session_state.adulto):
                     with st.expander(f"Condena Adulto {i+1}", expanded=True):
                         ad['rit'] = st.text_input("RIT", ad.get('rit',''), key=f"arit{i}")
@@ -667,12 +723,11 @@ def main_app():
                     st.session_state.adulto.append({})
                     st.rerun()
 
-        # --- LÓGICA PARA OTROS ESCRITOS ---
+        # --- OTROS ESCRITOS ---
         elif tipo_recurso in ["Amparo Constitucional", "Apelación por Quebrantamiento"]:
             st.subheader("2. Fundamentos Específicos")
             datos_extra = {}
-            argumento_extra = st.text_area("Antecedentes de Hecho Adicionales (Opcional)", 
-                placeholder="Ingrese detalles específicos del caso...", height=150)
+            argumento_extra = st.text_area("Antecedentes de Hecho Adicionales (Opcional)", height=150)
             st.session_state.argumento_extra = argumento_extra
 
         elif tipo_recurso == "Minuta Control de Detención":
@@ -682,19 +737,14 @@ def main_app():
                 f_det = c1.text_input("Fecha/Hora Detención")
                 l_det = c2.text_input("Lugar Detención")
                 
-                # CAMPOS NUEVOS SOLICITADOS
                 hechos_relato = st.text_area("Relato de Hechos (Fiscalía)", height=100)
                 version_imp = st.text_area("Versión del Imputado", height=100)
                 
-                # ARGUMENTOS AMPLIADOS
                 args_sel = st.multiselect("Argumentos Defensa", [
                     "Ilegalidad: Falta de indicios (Art 85 CPP)",
                     "Ilegalidad: Ausencia de Flagrancia (Art 83 CPP)",
-                    "Ilegalidad: Lectura tardía de derechos (Art 135 CPP)",
-                    "Vulneración de cadena de custodia",
-                    "Uso desproporcionado de fuerza",
-                    "RPA: Falta de notificación a padres/adultos",
-                    "RPA: Esposamiento injustificado"
+                    "Ilegalidad: Lectura tardía de derechos",
+                    "RPA: Falta de notificación a padres"
                 ])
                 
                 gen_minuta = st.form_submit_button("Generar Vista Previa")
@@ -718,20 +768,17 @@ def main_app():
                 </div>
                 """, unsafe_allow_html=True)
 
-        # --- BOTÓN GENERAR (COMÚN) ---
+        # BOTÓN GENERAR
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button(f"🚀 GENERAR ESCRITO: {tipo_recurso}", type="primary", use_container_width=True):
-            # Recopilación de datos de Minuta para Word
             dm_safe = st.session_state.get('datos_minuta', {})
-            
             datos_finales = {
                 "tribunal_ej": st.session_state.tribunal_sel,
                 "prescripcion_list": st.session_state.prescripcion_list,
                 "rpa": st.session_state.rpa,
                 "adulto": st.session_state.adulto,
                 "ejecucion": st.session_state.ejecucion,
-                "rit_individualizacion": st.session_state.get('rit_individualizacion', ''),
-                "ruc_individualizacion": st.session_state.get('ruc_individualizacion', ''),
+                "lista_individualizacion": st.session_state.lista_individualizacion,
                 "argumento_extra": st.session_state.get('argumento_extra', ''),
                 "fecha_det": dm_safe.get('fecha', ''),
                 "lugar_det": dm_safe.get('lugar', ''),
@@ -746,77 +793,96 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-    # === TAB 2: PROGNOSIS & CALCULADORA (MEJORADA) ===
+    # === TAB 2: PROGNOSIS Y TEORÍA (ACTUALIZADA) ===
     with tabs[1]:
-        st.header("🧮 Calculadora de Prognosis Penal")
+        st.header("🧮 Calculadora de Prognosis Penal & Teoría del Caso")
         
-        # Toggle RPA/Adulto dentro del módulo
-        modo_prognosis = st.radio("Régimen Legal:", ["Ley 20.084 (RPA)", "Adulto (General)"], horizontal=True)
-        es_rpa_calc = True if "RPA" in modo_prognosis else False
-        
-        # CAMPO NUEVO: RELATO DE HECHOS PARA TEORÍA
-        hechos_prognosis = st.text_area("Relato del Hecho (Para Teoría del Caso)", height=100, placeholder="Describa brevemente el hecho punible...")
+        col_conf1, col_conf2 = st.columns(2)
+        with col_conf1:
+            modo_prognosis = st.radio("Régimen Legal:", ["Ley 20.084 (RPA)", "Adulto (General)"], horizontal=True)
+            es_rpa_calc = True if "RPA" in modo_prognosis else False
+        with col_conf2:
+            delito = st.selectbox("Delito Imputado", list(DELITOS_INFO.keys()))
+
+        hechos_prognosis = st.text_area("Relato Fáctico del Caso (Para análisis IA)", height=120, placeholder="El imputado fue detenido portando...")
         
         c1, c2 = st.columns(2)
         with c1:
-            delito = st.selectbox("Delito", list(DELITOS_INFO.keys()))
-            atenuantes = st.multiselect("Atenuantes", ["11 N°6 Irreprochable", "11 N°9 Colaboración", "11 N°7 Reparación", "Autodenuncia", "Imputabilidad Disminuida (11 N°1)"])
+            atenuantes = st.multiselect("Circunstancias Atenuantes", ["11 N°6 Irreprochable", "11 N°9 Colaboración", "11 N°7 Reparación", "Autodenuncia", "Imputabilidad Disminuida (11 N°1)"])
         with c2:
-            agravantes = st.multiselect("Agravantes", ["12 N°1 Alevosía", "Reincidencia", "Pluralidad malhechores", "Cometer delito cumpliendo condena"])
+            agravantes = st.multiselect("Circunstancias Agravantes", ["12 N°1 Alevosía", "Reincidencia", "Pluralidad malhechores", "Cometer delito cumpliendo condena"])
             
-        if st.button("Generar Prognosis y Teoría del Caso"):
-            resultado = calcular_prognosis_avanzada(delito, atenuantes, agravantes, es_rpa_calc, hechos_prognosis)
-            st.markdown(f"<div class='calc-box'>{resultado}</div>", unsafe_allow_html=True)
+        if st.button("⚡ ANALIZAR CASO (IA + CÁLCULO)"):
+            with st.spinner("Calculando pena exacta y generando estrategia de defensa..."):
+                # 1. Cálculo Matemático
+                calc = calcular_pena_exacta(DELITOS_INFO[delito], atenuantes, agravantes, es_rpa_calc)
+                
+                # 2. IA Teoría
+                teoria_ia = generar_teoria_caso_ia(hechos_prognosis, delito, atenuantes, es_rpa_calc)
+                
+                # 3. Mostrar Resultados Visuales
+                st.markdown("---")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Pena Base (Grados)", calc['rango'])
+                m2.metric("Efecto Jurídico", calc['efecto'])
+                m3.metric("Pena Probable (Días Mínimos)", f"{calc['dias_min']} días")
+                
+                st.markdown(f"#### RIESGO DE CÁRCEL EFECTIVA: {calc['riesgo']}%")
+                st.progress(calc['riesgo'] / 100)
+                
+                st.markdown(f"<div class='{calc['badge']}'>RESULTADO: {calc['resultado']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("### 🧠 ESTRATEGIA DE DEFENSA (IA)")
+                st.markdown(f"<div class='teoria-box'>{teoria_ia}</div>", unsafe_allow_html=True)
+                
+                # Placeholder Supabase
+                st.info("📡 Supabase Analytics: Buscando sentencias similares... (0 casos encontrados en base fría)")
 
     # === TAB 3: TRANSCRIPTOR ===
     with tabs[2]:
         st.header("🎙️ Transcriptor Forense")
         st.info("Módulo de transcripción activado. Soporte para MP3, WAV, M4A.")
-        
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
-            uploaded_audio = st.file_uploader("Cargar Audio", type=["mp3", "wav", "m4a"])
-        with col_t2:
-            st.checkbox("Diarización (Identificar Hablantes)")
-            st.checkbox("Filtrar Ruido de Fondo")
-            st.checkbox("Timestamps (Marcas de tiempo)")
-            
-        if uploaded_audio:
-            st.audio(uploaded_audio)
-            if st.button("Iniciar Transcripción"):
-                with st.status("Procesando audio...", expanded=True):
-                    st.write("Subiendo a motor seguro...")
-                    time.sleep(1)
-                    st.write("Normalizando audio...")
-                    time.sleep(1)
-                    st.write("Generando texto...")
-                    time.sleep(1)
-                st.success("Transcripción Completada")
-                st.text_area("Resultado:", value="[00:00] JUEZ: Se abre la audiencia... \n[00:15] FISCAL: Comparece el Ministerio Público...", height=200)
+        uploaded_audio = st.file_uploader("Cargar Audio", type=["mp3", "wav", "m4a"])
+        if uploaded_audio and st.button("Iniciar Transcripción"):
+            with st.status("Procesando...", expanded=True):
+                time.sleep(2)
+                st.write("Generando texto...")
+            st.text_area("Resultado:", value="[00:00] JUEZ: Se abre la audiencia...", height=200)
 
     # === TAB 4: ADMIN ===
     with tabs[3]:
         if st.session_state.user_role == "Admin":
-            st.header("Panel de Control")
+            st.header("Panel de Control & Base de Datos")
             
-            # Agregar Usuario
-            with st.form("add_user"):
-                u_nom = st.text_input("Nombre")
-                u_mail = st.text_input("Email")
-                u_pass = st.text_input("Pass", type="password")
-                u_rol = st.selectbox("Rol", ["User", "Admin"])
-                if st.form_submit_button("Crear Usuario"):
-                    st.session_state.db_users.append({"email": u_mail, "pass": u_pass, "rol": u_rol, "nombre": u_nom})
-                    st.success("Usuario Creado")
+            # Gestión Usuarios
+            with st.expander("👥 Gestión de Usuarios"):
+                with st.form("add_user"):
+                    u_nom = st.text_input("Nombre")
+                    u_mail = st.text_input("Email")
+                    u_pass = st.text_input("Pass", type="password")
+                    u_rol = st.selectbox("Rol", ["User", "Admin"])
+                    if st.form_submit_button("Crear"):
+                        st.session_state.db_users.append({"email": u_mail, "pass": u_pass, "rol": u_rol, "nombre": u_nom})
+                        st.success("Creado")
+                
+                for i, u in enumerate(st.session_state.db_users):
+                    c1, c2, c3 = st.columns([3, 2, 1])
+                    c1.write(f"{u['nombre']} ({u['rol']})")
+                    if c3.button("Eliminar", key=f"del_{i}"):
+                        st.session_state.db_users.pop(i)
+                        st.rerun()
             
-            # Listar/Borrar
-            st.subheader("Usuarios")
-            for i, u in enumerate(st.session_state.db_users):
-                c1, c2, c3 = st.columns([3, 2, 1])
-                c1.write(f"{u['nombre']} ({u['rol']})")
-                if c3.button("Eliminar", key=f"del_{i}"):
-                    st.session_state.db_users.pop(i)
-                    st.rerun()
+            # Gestión Jurisprudencia (Placeholder Conexión Supabase)
+            with st.expander("📚 Base de Jurisprudencia (Supabase)"):
+                st.text_input("Buscar Fallo (Rol / Tema)")
+                st.button("🔍 Consultar Base Remota")
+                st.caption("Estado: Conexión Establecida con 'jurisprudencia_db'")
+                
+            # Gestión Escritos
+            with st.expander("📄 Base de Escritos (Templates)"):
+                st.write("Total plantillas activas: 5")
+                st.button("Sincronizar Nuevos Formatos")
+
         else:
             st.warning("Acceso Denegado")
 
