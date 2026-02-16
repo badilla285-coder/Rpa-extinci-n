@@ -11,8 +11,8 @@ from supabase import create_client
 import google.generativeai as genai
 import time
 import random
-import tempfile # Nueva dependencia agregada
-import os       # Nueva dependencia agregada
+import tempfile
+import os
 
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
@@ -135,29 +135,74 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 2. CONFIGURACIÓN SERVICIOS (MODIFICADO POR SEGURIDAD)
+# 2. CONFIGURACIÓN SERVICIOS
 # =============================================================================
 
 # === CONFIGURACIÓN SEGURA (SECRETS) ===
 try:
-    # Intenta leer la clave desde los secretos de Streamlit
     if "GOOGLE_API_KEY" in st.secrets:
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     else:
-        # Fallback para entorno local si no hay secrets.toml (opcional, o mostrar error)
-        # Nota: Para producción, SIEMPRE usar st.secrets
         st.error("⚠️ FALTA CONFIGURAR LA API KEY EN SECRETS (GOOGLE_API_KEY).")
 except Exception as e:
     st.error(f"⚠️ Error configurando API Key: {e}")
 
 def get_gemini_model():
     try:
-        # Intentamos obtener el modelo más capaz disponible para multimodal
         return genai.GenerativeModel('gemini-1.5-flash')
     except:
         return genai.GenerativeModel('gemini-pro')
 
 model_ia = get_gemini_model()
+
+# === FUNCIÓN DE SEGURIDAD PARA EMBEDDINGS ===
+def obtener_embedding_seguro(texto):
+    """Intenta usar el modelo nuevo, si falla usa el legacy"""
+    try:
+        # Intento 1: Modelo moderno
+        return genai.embed_content(model="models/text-embedding-004", content=texto, task_type="retrieval_document")['embedding']
+    except Exception:
+        try:
+            # Intento 2: Modelo clásico (Legacy) - Este casi nunca falla
+            return genai.embed_content(model="models/embedding-001", content=texto, task_type="retrieval_document")['embedding']
+        except Exception as e:
+            st.error(f"Error crítico en embedding: {e}")
+            return None
+
+# === FUNCIÓN PARA METADATA PROFUNDA (NUEVA) ===
+def analizar_metadata_profunda(texto_completo):
+    """Usa IA para extraer metadata precisa del texto completo del documento."""
+    try:
+        prompt = f"""
+        Eres un Actuario Judicial experto. Lee este documento legal COMPLETO. 
+        Extrae con precisión quirúrgica un JSON válido con los siguientes campos:
+        {{
+            "tribunal": "Nombre exacto del tribunal (ej: 7 Juzgado de Garantía de Santiago)",
+            "rol": "RIT o Rol de la causa (ej: 450-2023)",
+            "fecha_sentencia": "Fecha del documento o sentencia (YYYY-MM-DD) o 'S/F'",
+            "resultado": "Resumen muy breve (ej: Condenatoria, Absolutoria, Acoge Recurso)",
+            "tema": "Palabras clave del tema jurídico (ej: Nulidad, Prisión Preventiva)",
+            "tipo": "Tipo de documento (Jurisprudencia, Ley, Doctrina)"
+        }}
+        
+        TEXTO DEL DOCUMENTO (Primeros 15000 caracteres):
+        {texto_completo[:15000]}
+        """
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Forzamos respuesta JSON limpia
+        resp = model.generate_content(prompt)
+        clean_json = resp.text.replace('```json', '').replace('```', '').strip()
+        return json.loads(clean_json)
+    except Exception as e:
+        # Fallback en caso de error de IA
+        return {
+            "tribunal": "Desconocido/Error IA",
+            "rol": "S/N",
+            "fecha_sentencia": datetime.now().strftime("%Y-%m-%d"),
+            "resultado": "Pendiente",
+            "tema": "General",
+            "tipo": "Documento Legal"
+        }
 
 SUPABASE_URL = "https://zblcddxbhyomkasmbvyz.supabase.co"
 SUPABASE_KEY = "sb_publishable_pHMqXxI39AssehHdBs1wqA_NVjPc-FT"
@@ -211,17 +256,17 @@ ESCALA_PENAS = [
 
 # Base de datos de delitos con índice de grado base en ESCALA_PENAS
 DELITOS_INFO = {
-    "Robo con Intimidación": {"idx_min": 6, "idx_max": 8}, # Mayor min a max
+    "Robo con Intimidación": {"idx_min": 6, "idx_max": 8},
     "Robo con Violencia": {"idx_min": 6, "idx_max": 8},
-    "Robo en Lugar Habitado": {"idx_min": 6, "idx_max": 6}, # Mayor min
-    "Microtráfico (Art. 4)": {"idx_min": 4, "idx_max": 5}, # Menor medio a max
-    "Tráfico Ilícito (Art. 3)": {"idx_min": 6, "idx_max": 7}, # Mayor min a medio
-    "Homicidio Simple": {"idx_min": 7, "idx_max": 8}, # Mayor medio a max
-    "Receptación": {"idx_min": 3, "idx_max": 5}, # Menor cualquiera
-    "Porte Ilegal de Arma": {"idx_min": 5, "idx_max": 6}, # Menor max a Mayor min
-    "Lesiones Graves": {"idx_min": 4, "idx_max": 4}, # Menor medio
-    "Amenazas Simples": {"idx_min": 3, "idx_max": 3}, # Menor min
-    "Maltrato de Obra a Carabineros": {"idx_min": 4, "idx_max": 5} # Menor medio a max
+    "Robo en Lugar Habitado": {"idx_min": 6, "idx_max": 6},
+    "Microtráfico (Art. 4)": {"idx_min": 4, "idx_max": 5},
+    "Tráfico Ilícito (Art. 3)": {"idx_min": 6, "idx_max": 7},
+    "Homicidio Simple": {"idx_min": 7, "idx_max": 8},
+    "Receptación": {"idx_min": 3, "idx_max": 5},
+    "Porte Ilegal de Arma": {"idx_min": 5, "idx_max": 6},
+    "Lesiones Graves": {"idx_min": 4, "idx_max": 4},
+    "Amenazas Simples": {"idx_min": 3, "idx_max": 3},
+    "Maltrato de Obra a Carabineros": {"idx_min": 4, "idx_max": 5}
 }
 
 # =============================================================================
@@ -284,19 +329,14 @@ class GeneradorWord:
         if sangria and align == "JUSTIFY":
             p.paragraph_format.first_line_indent = Inches(0.5)
         
-        # Primero reemplazamos las variables
         texto_final = texto.replace("{DEFENSOR}", self.defensor).replace("{IMPUTADO}", self.imputado)
         
         if negrita:
-            # Si todo el párrafo es negrita, lo aplicamos directo
             run = p.add_run(texto_final)
             run.font.name = 'Cambria'
             run.font.size = Pt(12)
             run.bold = True
         else:
-            # CORRECCIÓN DEFINITIVA DE DUPLICADOS:
-            # Usamos split con paréntesis para conservar los delimitadores, pero procesamos linealmente.
-            # \b asegura que solo coincida con palabras completas.
             keywords = [
                 r"RIT:?\s?[\w\d-]+", r"RUC:?\s?[\w\d-]+", 
                 "POR TANTO", "OTROSÍ", "EN LO PRINCIPAL", 
@@ -305,30 +345,23 @@ class GeneradorWord:
                 "FUNDAMENTOS DE DERECHO:", "ANTECEDENTES DE HECHO:"
             ]
             
-            # Unimos keywords y escapamos nombres para crear el patrón
             patron_regex = "|".join(keywords) + f"|{re.escape(self.defensor)}|{re.escape(self.imputado)}"
-            
-            # Encontramos todas las coincidencias y sus posiciones
             matches = list(re.finditer(patron_regex, texto_final, flags=re.IGNORECASE))
             
             last_pos = 0
             for match in matches:
-                # Texto normal antes de la coincidencia
                 start, end = match.span()
                 if start > last_pos:
                     run = p.add_run(texto_final[last_pos:start])
                     run.font.name = 'Cambria'
                     run.font.size = Pt(12)
                 
-                # Texto en negrita (la coincidencia)
                 run_bold = p.add_run(texto_final[start:end])
                 run_bold.font.name = 'Cambria'
                 run_bold.font.size = Pt(12)
                 run_bold.bold = True
-                
                 last_pos = end
             
-            # Texto restante después de la última coincidencia
             if last_pos < len(texto_final):
                 run = p.add_run(texto_final[last_pos:])
                 run.font.name = 'Cambria'
@@ -374,15 +407,12 @@ class GeneradorWord:
         self.add_parrafo(intro)
 
         # 4. CUERPO DEL ESCRITO
-        
         if tipo == "Prescripción de la Pena":
             self.add_parrafo("Que, por medio de la presente, vengo en solicitar a S.S. se sirva fijar día y hora para celebrar audiencia con el objeto de debatir sobre la prescripción de la pena respecto de mi representado, de conformidad a lo dispuesto en el artículo 5 de la Ley N° 20.084 y las normas pertinentes del Código Penal.")
             self.add_parrafo("Fundamento esta solicitud en que existen sentencias condenatorias en las causas señaladas, cuyo cumplimiento a la fecha se encuentra prescrito por el transcurso del tiempo, conforme a los siguientes antecedentes:")
-            
             lista_p = datos.get('prescripcion_list', [])
             if not lista_p:
                 self.add_parrafo("(Debe ingresar las causas en el formulario lateral)")
-            
             for c in lista_p:
                 parrafo_causa = (
                     f"En la causa RUC {c['ruc']} (RIT {c['rit']} de este Tribunal): Mi representado fue condenado por sentencia de fecha {c['fecha_sentencia']}, "
@@ -390,7 +420,6 @@ class GeneradorWord:
                     f"Dicha sentencia se encuentra ejecutoriada (o con cumplimiento suspendido) desde el {c['fecha_suspension']}."
                 )
                 self.add_parrafo(parrafo_causa)
-            
             self.add_parrafo("Teniendo presente el tiempo transcurrido desde las fechas de las sentencias y, específicamente, desde la suspensión del cumplimiento, hasta la fecha actual (transcurriendo en exceso el plazo legal exigido para la prescripción de las sanciones en el marco de la Responsabilidad Penal Adolescente), solicito se fije audiencia con el objeto de debatir y declarar la prescripción de la pena y el consecuente sobreseimiento definitivo.")
             self.add_parrafo("POR TANTO, en mérito de lo expuesto y normativa legal citada,", sangria=False)
             self.add_parrafo("SOLICITO A S. S. acceder a lo solicitado, fijando día y hora para celebrar audiencia a fin de que se abra debate y se declare la prescripción de las penas en las presentes causas.", sangria=False)
@@ -495,12 +524,9 @@ def login_screen():
                 <div class='login-title'>🏛️ ACCESO AL SISTEMA IABL</div>
         """, unsafe_allow_html=True)
         
-        # Pestañas para Login o Registro
         tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
 
-        # --- LOGIN ---
         with tab_login:
-            # st.form ya permite enviar con ENTER por defecto en los campos de texto
             with st.form("login_form"):
                 email = st.text_input("Correo Electrónico")
                 password = st.text_input("Contraseña", type="password")
@@ -508,17 +534,13 @@ def login_screen():
                 
                 if submitted:
                     try:
-                        # 1. Intentar Login con Supabase
                         session = supabase.auth.sign_in_with_password({"email": email, "password": password})
                         user = session.user
-                        
-                        # 2. Si entra, consultamos su ROL en la tabla 'profiles' que creamos
                         data = supabase.table("profiles").select("*").eq("id", user.id).execute()
-                        
                         if data.data:
                             perfil = data.data[0]
                             st.session_state.logged_in = True
-                            st.session_state.user_role = perfil['rol'] # Admin o User
+                            st.session_state.user_role = perfil['rol']
                             st.session_state.defensor_nombre = perfil['nombre']
                             st.session_state.user_email = email
                             st.success("¡Bienvenido!")
@@ -526,11 +548,9 @@ def login_screen():
                             st.rerun()
                         else:
                             st.error("Error: Usuario autenticado pero sin perfil.")
-                            
                     except Exception as e:
                         st.error(f"Credenciales incorrectas o error de conexión: {e}")
 
-        # --- REGISTRO (Solo para nuevos usuarios) ---
         with tab_registro:
             with st.form("register_form"):
                 new_email = st.text_input("Tu Correo")
@@ -540,7 +560,6 @@ def login_screen():
                 
                 if reg_submit:
                     try:
-                        # Esto crea el usuario y dispara el Trigger SQL que hicimos
                         response = supabase.auth.sign_up({
                             "email": new_email, 
                             "password": new_pass,
@@ -677,7 +696,6 @@ def main_app():
 
     st.title(f"📄 {tipo_recurso}")
     
-    # PESTAÑAS (Reorganizadas para incluir Biblioteca Inteligente y Admin mejorado, y recuperar Transcriptor y Analista)
     tabs = st.tabs([
         "📝 Generador", 
         "🕵️ Analista Multimodal", 
@@ -686,7 +704,7 @@ def main_app():
         "⚙️ Admin & BD"
     ])
 
-    # === TAB 1: GENERADOR (RESTAURADO COMPLETO) ===
+    # === TAB 1: GENERADOR ===
     with tabs[0]:
         st.markdown("### 1. Individualización")
         col_def, col_imp = st.columns(2)
@@ -711,7 +729,6 @@ def main_app():
 
         st.markdown("---")
         
-        # --- LÓGICA DE PRESCRIPCIÓN ---
         if tipo_recurso == "Prescripción de la Pena":
             st.subheader("2. Causas a Prescribir (Detalle)")
             with st.form("form_prescripcion"):
@@ -741,7 +758,6 @@ def main_app():
                         st.session_state.prescripcion_list.pop(i)
                         st.rerun()
 
-        # --- LÓGICA DE EXTINCIÓN ---
         elif tipo_recurso == "Extinción Art. 25 ter":
             c_rpa, c_ad = st.columns(2)
             with c_rpa:
@@ -775,10 +791,8 @@ def main_app():
                     st.session_state.adulto.append({})
                     st.rerun()
 
-        # --- OTROS ESCRITOS ---
         elif tipo_recurso in ["Amparo Constitucional", "Apelación por Quebrantamiento"]:
             st.subheader("2. Fundamentos Específicos")
-            datos_extra = {}
             argumento_extra = st.text_area("Antecedentes de Hecho Adicionales (Opcional)", height=150)
             st.session_state.argumento_extra = argumento_extra
 
@@ -817,7 +831,6 @@ def main_app():
                 </div>
                 """, unsafe_allow_html=True)
 
-        # BOTÓN GENERAR
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button(f"🚀 GENERAR ESCRITO: {tipo_recurso}", type="primary", use_container_width=True):
             dm_safe = st.session_state.get('datos_minuta', {})
@@ -842,12 +855,11 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-    # === TAB 2: ANALISTA MULTIMODAL (ACTUALIZADO: VISIÓN + MÚLTIPLES ARCHIVOS) ===
+    # === TAB 2: ANALISTA MULTIMODAL ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
         st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
 
-        # 1. SELECCIÓN DE OBJETIVO ESTRATÉGICO
         objetivo_analisis = st.radio(
             "¿Qué buscas en estos documentos?",
             ["📄 Control de Detención (Busca ilegalidades)", 
@@ -856,14 +868,12 @@ def main_app():
             horizontal=True
         )
 
-        # 2. CARGA DE EVIDENCIA (MÚLTIPLES ARCHIVOS)
         archivos_evidencia = st.file_uploader(
             "Cargar Evidencia (PDF, JPG, PNG, TXT)", 
             type=["pdf", "jpg", "png", "txt", "jpeg"], 
             accept_multiple_files=True
         )
 
-        # 3. CONTEXTO ADICIONAL
         contexto_usuario = st.text_area("Contexto adicional (Ej: 'El cliente dice que Carabineros mintió...')")
 
         if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA"):
@@ -880,10 +890,7 @@ def main_app():
                             tmp.write(archivo.getvalue())
                             tmp_path = tmp.name
 
-                        # SUBIR A GEMINI (Admite imágenes, pdfs, etc.)
                         f_gemini = genai.upload_file(tmp_path)
-                        
-                        # Esperar procesamiento
                         while f_gemini.state.name == "PROCESSING":
                             time.sleep(1)
                             f_gemini = genai.get_file(f_gemini.name)
@@ -893,7 +900,6 @@ def main_app():
 
                     status_box.info("🧠 Generando estrategia jurídica...")
 
-                    # --- DEFINICIÓN DE PROMPTS SEGÚN OBJETIVO ---
                     if "Control de Detención" in objetivo_analisis:
                         system_prompt = """
                         Eres un Abogado Penalista experto en Garantías. Analiza la evidencia visual y textual adjunta (Partes, Actas).
@@ -907,7 +913,6 @@ def main_app():
                         
                         SALIDA: Lista de ilegalidades con probabilidad de éxito y argumentos.
                         """
-                    
                     elif "Teoría del Caso" in objetivo_analisis:
                         system_prompt = """
                         Eres un Estratega de Defensa Penal. Analiza toda la evidencia.
@@ -919,8 +924,7 @@ def main_app():
                         3. Prognosis de Pena: Calcula pena probable.
                         4. ¿Absolución o Negociación?
                         """
-                    
-                    else: # Salidas Alternativas
+                    else:
                         system_prompt = """
                         Eres experto en Ejecución Penal y Salidas Alternativas.
                         TU MISIÓN: Verificar viabilidad de términos anticipados.
@@ -935,7 +939,6 @@ def main_app():
                     prompt_final = [system_prompt, f"Contexto adicional: {contexto_usuario}"]
                     prompt_final.extend(docs_para_gemini)
 
-                    # Usamos el modelo configurado (Flash o Pro)
                     response = model_ia.generate_content(prompt_final)
                     
                     status_box.success("✅ Análisis Completado")
@@ -947,7 +950,7 @@ def main_app():
                 except Exception as e:
                     st.error(f"Error en el análisis multimodal: {e}")
 
-    # === TAB 3: TRANSCRIPTOR (MANTENIDO) ===
+    # === TAB 3: TRANSCRIPTOR ===
     with tabs[2]:
         st.header("🎙️ Transcriptor Forense & Generador de Recursos")
         st.info("Sube el audio de la audiencia (MP3, WAV, M4A) para obtener la transcripción literal y un borrador de recurso inteligente.")
@@ -960,11 +963,8 @@ def main_app():
                 
                 with st.spinner("🔄 Auto-detectando modelo y procesando..."):
                     try:
-                        # --- PASO 0: DETECCIÓN AUTOMÁTICA DEL MODELO ---
-                        # Busca dinámicamente qué modelo tiene acceso a 'generateContent'
                         modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                         
-                        # Prioridad: Flash -> Pro -> Cualquiera 1.5
                         modelo_a_usar = None
                         for m in modelos_disponibles:
                             if 'gemini-1.5-flash' in m:
@@ -982,7 +982,6 @@ def main_app():
 
                         status_container.info(f"🤖 Modelo detectado y seleccionado: {modelo_a_usar}")
 
-                        # --- PASO 1: SUBIDA ---
                         suffix = f".{uploaded_audio.name.split('.')[-1]}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                             tmp_file.write(uploaded_audio.getvalue())
@@ -990,7 +989,6 @@ def main_app():
 
                         archivo_gemini = genai.upload_file(tmp_path, mime_type="audio/mp3")
 
-                        # --- PASO 2: ESPERA ACTIVA (OBLIGATORIO) ---
                         status_container.info("⏳ Esperando procesamiento de Google...")
                         while archivo_gemini.state.name == "PROCESSING":
                             time.sleep(2)
@@ -999,10 +997,8 @@ def main_app():
                         if archivo_gemini.state.name == "FAILED":
                             raise ValueError("Google falló al procesar el audio.")
 
-                        # --- PASO 3: GENERACIÓN ---
                         status_container.info("📝 Redactando recurso...")
                         
-                        # AQUÍ USAMOS LA VARIABLE AUTOMÁTICA
                         model_transcriptor = genai.GenerativeModel(modelo_a_usar)
 
                         prompt_transcripcion = """
@@ -1015,7 +1011,6 @@ def main_app():
                         response = model_transcriptor.generate_content([prompt_transcripcion, archivo_gemini])
                         texto_generado = response.text
 
-                        # --- FINALIZACIÓN ---
                         status_container.success("✅ ¡Listo!")
                         st.subheader(f"📄 Resultado (Usando {modelo_a_usar})")
                         st.markdown(texto_generado)
@@ -1030,7 +1025,7 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: BIBLIOTECA INTELIGENTE (NUEVO: BUSCADOR LIBRE & ANÁLISIS) ===
+    # === TAB 4: BIBLIOTECA INTELIGENTE (ACTUALIZADO: BÚSQUEDA SEGURA) ===
     with tabs[3]:
         st.header("📚 Biblioteca Jurídica Inteligente")
         
@@ -1043,41 +1038,38 @@ def main_app():
             if query_busqueda and st.button("Buscar Fallos"):
                 with st.spinner("Buscando en cerebro legal..."):
                     try:
-                        # 1. Generar Embedding de la consulta
-                        emb_resp = genai.embed_content(
-                            model="models/text-embedding-004",
-                            content=query_busqueda,
-                            task_type="retrieval_query"
-                        )
-                        vector_consulta = emb_resp['embedding']
+                        # USO DE FUNCIÓN SEGURA
+                        vector_consulta = obtener_embedding_seguro(query_busqueda)
                         
-                        # 2. Traer documentos (Simulación de búsqueda vectorial si no hay RPC configurada)
-                        # Nota: En producción idealmente usar supabase.rpc('match_documents', ...)
-                        # Aquí traemos una muestra para filtrar por relevancia (Python-side logic para prototipo)
-                        res = supabase.table("documentos_legales").select("*").limit(50).execute()
-                        
-                        if res.data:
-                            import numpy as np
-                            resultados = []
-                            for doc in res.data:
-                                vec_doc = doc.get('embedding')
-                                if vec_doc:
-                                    # Cálculo similitud coseno simple
-                                    sim = np.dot(vector_consulta, vec_doc) / (np.linalg.norm(vector_consulta) * np.linalg.norm(vec_doc))
-                                    resultados.append((sim, doc))
+                        if vector_consulta:
+                            # 2. Traer documentos (Simulación de búsqueda vectorial si no hay RPC configurada)
+                            res = supabase.table("documentos_legales").select("*").limit(50).execute()
                             
-                            # Ordenar por similitud
-                            resultados.sort(key=lambda x: x[0], reverse=True)
-                            
-                            st.subheader("Resultados Relevantes:")
-                            for sim, doc in resultados[:5]: # Top 5
-                                meta = doc['metadata']
-                                with st.expander(f"⚖️ {meta.get('tribunal','Tribunal')} - Rol: {meta.get('rol','S/N')} ({int(sim*100)}% Coincidencia)"):
-                                    st.caption(f"Tema: {meta.get('tema','General')} | Tipo: {meta.get('tipo_doc','Documento')}")
-                                    st.write(doc['contenido'][:500] + "...")
-                                    st.button("Copiar Cita", key=f"btn_{doc['id']}")
+                            if res.data:
+                                import numpy as np
+                                resultados = []
+                                for doc in res.data:
+                                    vec_doc = doc.get('embedding')
+                                    if vec_doc:
+                                        # Cálculo similitud coseno simple
+                                        sim = np.dot(vector_consulta, vec_doc) / (np.linalg.norm(vector_consulta) * np.linalg.norm(vec_doc))
+                                        resultados.append((sim, doc))
+                                
+                                # Ordenar por similitud
+                                resultados.sort(key=lambda x: x[0], reverse=True)
+                                
+                                st.subheader("Resultados Relevantes:")
+                                for sim, doc in resultados[:5]: # Top 5
+                                    meta = doc['metadata']
+                                    with st.expander(f"⚖️ {meta.get('tribunal','Tribunal')} - Rol: {meta.get('rol','S/N')} ({int(sim*100)}% Coincidencia)"):
+                                        st.caption(f"Tema: {meta.get('tema','General')} | Tipo: {meta.get('tipo_doc','Documento')}")
+                                        st.markdown(f"**Resultado:** {meta.get('resultado', '')}")
+                                        st.write(doc['contenido'][:500] + "...")
+                                        st.button("Copiar Cita", key=f"btn_{doc['id']}")
+                            else:
+                                st.warning("No hay documentos en la base de datos aún.")
                         else:
-                            st.warning("No hay documentos en la base de datos aún.")
+                            st.error("No se pudo generar el vector de búsqueda.")
 
                     except Exception as e:
                         st.error(f"Error en búsqueda: {e}")
@@ -1087,73 +1079,92 @@ def main_app():
             borrador = st.file_uploader("Sube tu borrador (PDF/Word/Txt)", type=["pdf","docx","txt"])
             
             if borrador and st.button("Analizar y Buscar Apoyo"):
-                # Lógica simplificada: Leer -> Extraer Keywords -> Buscar
                 st.success("Funcionalidad en desarrollo: Conectará tu borrador con la búsqueda vectorial mostrada arriba.")
 
-    # === TAB 5: ADMIN & CARGA (ACTUALIZADO: CLASIFICACIÓN & CHUNKING) ===
+    # === TAB 5: ADMIN & CARGA (REESCRITO: INGESTA INTELIGENTE & ROBUSTA) ===
     with tabs[4]:
         if st.session_state.user_role == "Admin":
             st.header("⚙️ Cerebro Centralizado (Admin)")
-            st.info("Alimenta el sistema con Leyes y Jurisprudencia.")
+            st.info("Alimenta el sistema con Leyes y Jurisprudencia. Proceso inteligente con IA.")
 
-            col_subida, col_consulta = st.columns(2)
+            col_subida, col_consulta = st.columns([2, 1])
 
             with col_subida:
-                st.subheader("1. Ingesta de Documentos")
-                archivo_pdf = st.file_uploader("Subir Archivo (PDF)", type="pdf", key="pdf_rag")
+                st.subheader("1. Ingesta Inteligente de Documentos")
                 
-                # Clasificación de Documento
-                tipo_doc = st.selectbox("Tipo de Documento", ["Jurisprudencia (Fallo)", "Legislación (Ley/Código)", "Doctrina"])
-                
-                meta_rol = st.text_input("Rol / RIT / N° Ley", placeholder="Ej: 1234-2024")
-                meta_tribunal = st.selectbox("Tribunal / Origen", ["Corte Suprema", "C. Apelaciones Santiago", "C. Apelaciones San Miguel", "TC", "Juzgado Garantía", "Congreso Nacional"])
-                meta_etiqueta = st.text_input("Tema / Etiqueta", placeholder="Ej: Nulidad, Prisión Preventiva, 25 ter")
+                # Uploader Múltiple
+                archivos_pdf = st.file_uploader(
+                    "Subir Archivos (PDF) - Máx 10", 
+                    type="pdf", 
+                    accept_multiple_files=True,
+                    key="pdf_rag_multi"
+                )
 
-                if archivo_pdf and st.button("💾 Guardar en Memoria"):
-                    with st.spinner("Procesando documento e indexando..."):
-                        try:
-                            # 1. Leer PDF
-                            reader = PyPDF2.PdfReader(archivo_pdf)
-                            texto_completo = ""
-                            for page in reader.pages:
-                                texto_completo += page.extract_text()
+                # Validación de seguridad
+                if archivos_pdf:
+                    if len(archivos_pdf) > 10:
+                        st.error("⚠️ Por estabilidad y seguridad, sube máximo 10 archivos a la vez.")
+                        st.stop()
+
+                    if st.button("💾 Procesar y Guardar en Memoria"):
+                        progress_bar_general = st.progress(0)
+                        total_files = len(archivos_pdf)
+                        
+                        for idx_file, archivo_pdf in enumerate(archivos_pdf):
+                            with st.status(f"Procesando {archivo_pdf.name}...", expanded=False) as status:
+                                try:
+                                    # 1. Leer PDF COMPLETO (Full Context)
+                                    status.write("Leyendo documento completo...")
+                                    reader = PyPDF2.PdfReader(archivo_pdf)
+                                    texto_completo = ""
+                                    for page in reader.pages:
+                                        texto_completo += page.extract_text() or ""
+                                    
+                                    if not texto_completo:
+                                        status.update(label=f"❌ Archivo vacío o ilegible: {archivo_pdf.name}", state="error")
+                                        continue
+
+                                    # 2. Análisis de Metadata Profunda con IA
+                                    status.write("Analizando metadata jurídica con IA...")
+                                    metadata_ia = analizar_metadata_profunda(texto_completo)
+                                    
+                                    # Agregamos origen al metadata
+                                    metadata_ia["origen"] = archivo_pdf.name
+                                    
+                                    status.write(f"Metadata detectada: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
+
+                                    # 3. Fragmentar texto (Chunking)
+                                    status.write("Fragmentando texto...")
+                                    chunk_size = 1500 # Un poco más grande para mejor contexto
+                                    chunks = [texto_completo[i:i+chunk_size] for i in range(0, len(texto_completo), chunk_size)]
+                                    
+                                    # 4. Vectorizar y Guardar
+                                    status.write("Generando vectores y guardando...")
+                                    for i, chunk in enumerate(chunks):
+                                        # USO DE FUNCIÓN SEGURA
+                                        vector = obtener_embedding_seguro(chunk)
+
+                                        if vector:
+                                            data_insert = {
+                                                "contenido": chunk,
+                                                "metadata": metadata_ia, # Metadata enriquecida por IA
+                                                "embedding": vector
+                                            }
+                                            supabase.table("documentos_legales").insert(data_insert).execute()
+                                    
+                                    status.update(label=f"✅ {archivo_pdf.name} Procesado Exitosamente", state="complete")
+                                    st.toast(f"✅ Guardado: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
+
+                                except Exception as e:
+                                    status.update(label=f"❌ Error en {archivo_pdf.name}: {str(e)}", state="error")
+                                    st.error(f"Detalle error: {e}")
                             
-                            # 2. Fragmentar texto (Chunking 1000 chars)
-                            chunk_size = 1000
-                            chunks = [texto_completo[i:i+chunk_size] for i in range(0, len(texto_completo), chunk_size)]
-                            
-                            st.write(f"Documento dividido en {len(chunks)} fragmentos.")
-                            progress_bar = st.progress(0)
+                            # Actualizar barra de progreso general
+                            progress_bar_general.progress((idx_file + 1) / total_files)
 
-                            # 3. Vectorizar y Guardar
-                            for i, chunk in enumerate(chunks):
-                                response = genai.embed_content(
-                                    model="models/text-embedding-004",
-                                    content=chunk,
-                                    task_type="retrieval_document"
-                                )
-                                vector = response['embedding']
-
-                                data_insert = {
-                                    "contenido": chunk,
-                                    "metadata": {
-                                        "rol": meta_rol,
-                                        "tribunal": meta_tribunal,
-                                        "tema": meta_etiqueta,
-                                        "origen": archivo_pdf.name,
-                                        "tipo_doc": tipo_doc # Nueva metadata
-                                    },
-                                    "embedding": vector
-                                }
-                                supabase.table("documentos_legales").insert(data_insert).execute()
-                                progress_bar.progress((i + 1) / len(chunks))
-                            
-                            st.success(f"✅ Documento '{meta_rol}' indexado correctamente.")
-                            time.sleep(2)
-                            st.rerun()
-
-                        except Exception as e:
-                            st.error(f"Error indexando: {e}")
+                        st.success("🏁 Proceso de ingesta finalizado.")
+                        time.sleep(2)
+                        st.rerun()
 
             with col_consulta:
                 st.subheader("2. Inventario Documental")
@@ -1167,10 +1178,10 @@ def main_app():
                             rol = meta.get('rol', 'S/N')
                             if rol not in seen_rols:
                                 tabla_fallos.append({
-                                    "Tipo": meta.get('tipo_doc', 'N/A'),
+                                    "Tipo": meta.get('tipo', 'N/A'),
                                     "Rol": rol,
                                     "Tribunal": meta.get('tribunal', ''),
-                                    "Tema": meta.get('tema', '')
+                                    "Resultado": meta.get('resultado', '-')
                                 })
                                 seen_rols.add(rol)
                         st.dataframe(tabla_fallos, use_container_width=True)
