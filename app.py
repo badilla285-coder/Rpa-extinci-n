@@ -249,7 +249,7 @@ def analizar_pdf(uploaded_file, tipo):
         return None
 
 # =============================================================================
-# 5. MOTOR DE GENERACIÓN WORD (CORREGIDO PARA EVITAR DUPLICADOS)
+# 5. MOTOR DE GENERACIÓN WORD
 # =============================================================================
 class GeneradorWord:
     def __init__(self, defensor, imputado):
@@ -634,6 +634,7 @@ def calcular_pena_exacta(delito_info, atenuantes, agravantes, es_rpa):
         "badge": badge
     }
 
+# Función conservada aunque no se use en el nuevo Tab 2
 def generar_teoria_caso_ia(hechos, delito, atenuantes, es_rpa):
     contexto = "Adolescente (Ley 20.084)" if es_rpa else "Adulto"
     prompt = f"""
@@ -677,7 +678,7 @@ def main_app():
     st.title(f"📄 {tipo_recurso}")
     
     # PESTAÑAS
-    tabs = st.tabs(["📝 Generador", "🧮 Prognosis & Calculadora", "🎙️ Transcriptor", "👥 Admin & BD"])
+    tabs = st.tabs(["📝 Generador", "🧠 Analista Documental", "🎙️ Transcriptor", "👥 Admin & BD"])
 
     # === TAB 1: GENERADOR ===
     with tabs[0]:
@@ -835,34 +836,121 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-    # === TAB 2: PROGNOSIS Y TEORÍA (ACTUALIZADA) ===
+    # === TAB 2: SUPER ANALISTA DOCUMENTAL (ACD & TEORÍA DEL CASO) ===
     with tabs[1]:
-        st.header("🧮 Calculadora de Prognosis Penal & Teoría del Caso")
-        col_conf1, col_conf2 = st.columns(2)
-        with col_conf1:
-            modo_prognosis = st.radio("Régimen Legal:", ["Ley 20.084 (RPA)", "Adulto (General)"], horizontal=True)
-            es_rpa_calc = True if "RPA" in modo_prognosis else False
-        with col_conf2:
-            delito = st.selectbox("Delito Imputado", list(DELITOS_INFO.keys()))
-        hechos_prognosis = st.text_area("Relato Fáctico del Caso (Para análisis IA)", height=120)
-        c1, c2 = st.columns(2)
-        with c1:
-            atenuantes = st.multiselect("Circunstancias Atenuantes", ["11 N°6 Irreprochable", "11 N°9 Colaboración", "11 N°7 Reparación", "Autodenuncia", "Imputabilidad Disminuida (11 N°1)"])
-        with c2:
-            agravantes = st.multiselect("Circunstancias Agravantes", ["12 N°1 Alevosía", "Reincidencia", "Pluralidad malhechores"])
-        if st.button("⚡ ANALIZAR CASO (IA + CÁLCULO)"):
-            with st.spinner("Calculando..."):
-                calc = calcular_pena_exacta(DELITOS_INFO[delito], atenuantes, agravantes, es_rpa_calc)
-                teoria_ia = generar_teoria_caso_ia(hechos_prognosis, delito, atenuantes, es_rpa_calc)
-                m1, m2, m3 = st.columns(3)
-                m1.metric("Pena Base (Grados)", calc['rango'])
-                m2.metric("Efecto Jurídico", calc['efecto'])
-                m3.metric("Pena Probable (Días Mínimos)", f"{calc['dias_min']} días")
-                st.markdown(f"#### RIESGO DE CÁRCEL EFECTIVA: {calc['riesgo']}%")
-                st.progress(calc['riesgo'] / 100)
-                st.markdown(f"<div class='{calc['badge']}'>RESULTADO: {calc['resultado']}</div>", unsafe_allow_html=True)
-                st.markdown("### 🧠 ESTRATEGIA DE DEFENSA (IA)")
-                st.markdown(f"<div class='teoria-box'>{teoria_ia}</div>", unsafe_allow_html=True)
+        st.header("🧠 Analista Jurídico Multimodal (Documentos & Estrategia)")
+        st.info("Sube Carpetas Investigativas, Partes Policiales (incluso fotos/escaneados), Declaraciones o Peritajes.")
+
+        # 1. SELECCIÓN DE OBJETIVO
+        objetivo_analisis = st.radio(
+            "¿Qué buscas en estos documentos?",
+            ["📄 Control de Detención (Busca ilegalidades)", 
+             "⚖️ Teoría del Caso & Prognosis (Estrategia de fondo)",
+             "🔍 Análisis Normativo/Requisitos (Salidas Alternativas)"],
+            horizontal=True
+        )
+
+        # 2. CARGA DE EVIDENCIA (MÚLTIPLES ARCHIVOS)
+        archivos_evidencia = st.file_uploader(
+            "Cargar Evidencia (PDFs, Imágenes, Textos)", 
+            type=["pdf", "jpg", "png", "txt"], 
+            accept_multiple_files=True
+        )
+
+        # 3. CONTEXTO ADICIONAL
+        contexto_usuario = st.text_area("Contexto adicional (Opcional: 'El cliente dice que no estaba ahí...')")
+
+        if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA"):
+            status_box = st.empty()
+            with st.spinner("Leyendo documentos (incluso escaneados)..."):
+                try:
+                    texto_completo_evidencia = ""
+                    
+                    # --- PROCESAMIENTO INTELIGENTE DE ARCHIVOS ---
+                    docs_para_gemini = []
+                    
+                    for archivo in archivos_evidencia:
+                        status_box.info(f"Procesando: {archivo.name}...")
+                        
+                        # Guardar temporalmente
+                        suffix = f".{archivo.name.split('.')[-1]}"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                            tmp.write(archivo.getvalue())
+                            tmp_path = tmp.name
+
+                        # SUBIR A GEMINI (Para que él lea imágenes/PDFs escaneados)
+                        f_gemini = genai.upload_file(tmp_path)
+                        
+                        # Esperar procesamiento
+                        while f_gemini.state.name == "PROCESSING":
+                            time.sleep(1)
+                            f_gemini = genai.get_file(f_gemini.name)
+                            
+                        docs_para_gemini.append(f_gemini)
+                        # Limpieza local
+                        os.remove(tmp_path)
+
+                    status_box.info("🧠 Analizando estrategia legal...")
+
+                    # --- DEFINICIÓN DE PROMPTS SEGÚN OBJETIVO ---
+                    if "Control de Detención" in objetivo_analisis:
+                        system_prompt = """
+                        Eres un Abogado Penalista experto en Garantías. Analiza los documentos adjuntos (Partes, Actas).
+                        TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
+                        
+                        BUSCA ESPECÍFICAMENTE:
+                        1. Indicios del Art. 85 CPP: ¿Eran suficientes? ¿O fue 'olfato policial'?
+                        2. Flagrancia (Art. 130 CPP): ¿Se cumplía la temporalidad (12 horas)?
+                        3. Lectura de Derechos: ¿Fue oportuna?
+                        4. Uso de la fuerza / Constatación de lesiones.
+                        
+                        SALIDA ESPERADA:
+                        - Lista de Ilegalidades detectadas (con probabilidad de éxito: Alta/Media/Baja).
+                        - Argumentos sugeridos para la audiencia.
+                        - Citas legales precisas.
+                        """
+                    
+                    elif "Teoría del Caso" in objetivo_analisis:
+                        system_prompt = """
+                        Eres un Estratega de Defensa Penal.
+                        TU MISIÓN: Construir una Teoría del Caso sólida basada en la evidencia adjunta.
+                        
+                        ANALIZA:
+                        1. Debilidades de la prueba de cargo (Fiscalía).
+                        2. Coartadas posibles o hechos exculpatorios.
+                        3. Prognosis de Pena: Calcula la pena probable (considerando atenuantes posibles).
+                        4. ¿Es posible la absolución? ¿O conviene negociar?
+                        """
+                    
+                    else: # Analisis Normativo / Salidas
+                        system_prompt = """
+                        Eres un experto en Ejecución Penal y Salidas Alternativas.
+                        TU MISIÓN: Verificar requisitos para términos anticipados o penas sustitutivas.
+                        
+                        ANALIZA:
+                        1. ¿Cumple requisitos para Suspensión Condicional (Art. 237 CPP)? (Pena probable < 3 años, sin antecedentes).
+                        2. ¿Cumple requisitos para Acuerdo Reparatorio (Art. 241 CPP)? (Bienes jurídicos disponibles).
+                        3. ¿Procedimiento Abreviado o Simplificado? Pros y Contras.
+                        4. Ley 18.216: ¿A qué pena sustitutiva podría optar?
+                        """
+
+                    # --- LLAMADA A LA IA CON TODOS LOS ARCHIVOS ---
+                    prompt_final = [system_prompt, f"Contexto adicional del abogado: {contexto_usuario}"]
+                    prompt_final.extend(docs_para_gemini) # Le pasamos los archivos directo (Imágenes o PDFs)
+
+                    model_analist = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model_analist.generate_content(prompt_final)
+                    
+                    status_box.success("✅ Análisis Completado")
+                    
+                    st.markdown("---")
+                    st.markdown(response.text)
+                    
+                    # Opción de descargar el informe
+                    st.download_button("📥 Descargar Informe Estratégico", response.text, "Estrategia_Legal.txt")
+
+                except Exception as e:
+                    st.error(f"Error en el análisis: {e}")
 
     # === TAB 3: TRANSCRIPTOR (ACTUALIZADO: AUTO-DETECCIÓN DE MODELO) ===
     with tabs[2]:
