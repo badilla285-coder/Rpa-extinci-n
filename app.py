@@ -1035,53 +1035,104 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: ADMIN (ACTUALIZADO CON SUPABASE REAL) ===
+    # === TAB 4: ADMIN & BASE DE CONOCIMIENTO (JURISPRUDENCIA) ===
     with tabs[3]:
+        # Verificación de Rol (Solo Admin puede subir fallos)
         if st.session_state.user_role == "Admin":
-            st.header("Panel de Control & Base de Datos (Supabase)")
-            
-            # --- SECCIÓN: GESTIÓN DE USUARIOS (REAL) ---
-            with st.expander("👥 Usuarios Registrados (Tabla 'profiles')", expanded=True):
-                try:
-                    # Consulta Real a Supabase
-                    response = supabase.table("profiles").select("*").execute()
-                    users_data = response.data
-                    
-                    if users_data:
-                        st.success(f"Conexión exitosa. Se encontraron {len(users_data)} usuarios.")
-                        
-                        # Mostramos los datos en un Dataframe interactivo
-                        # Preparamos los datos para que se vean bien
-                        clean_data = []
-                        for u in users_data:
-                            clean_data.append({
-                                "Nombre": u.get("nombre", "Sin Nombre"),
-                                "Rol": u.get("rol", "N/A"),
-                                "ID/Email": u.get("email", u.get("id", "N/A")), # Fallback si no hay columna email
-                                "Fecha Registro": u.get("created_at", "")
-                            })
-                        
-                        st.dataframe(clean_data, use_container_width=True)
-                        
-                        st.markdown("---")
-                        st.caption("Nota: Para eliminar usuarios, se recomienda usar el Dashboard de Supabase para mantener la integridad de Auth.")
-                    else:
-                        st.warning("La tabla 'profiles' está vacía o no se pudo leer.")
-                        
-                except Exception as e:
-                    st.error(f"Error al consultar Supabase: {e}")
-                    st.code("Verifica que la tabla 'profiles' tenga permisos de lectura (RLS) o que la API Key sea correcta.")
+            st.header("🧠 Base de Conocimiento Jurídico (RAG)")
+            st.info("Aquí alimentas al sistema. Sube sentencias o leyes para que la IA las aprenda.")
 
-            # --- SECCIÓN: CONSULTAS (Mantenemos lo visual) ---
-            with st.expander("📚 Base de Jurisprudencia (Supabase)"):
-                st.text_input("Buscar Fallo (Rol / Tema)")
-                st.button("🔍 Consultar Base Remota")
-                st.caption("Estado: Conexión Establecida")
-            with st.expander("📄 Base de Escritos (Templates)"):
-                st.write("Total plantillas activas: 5")
-                st.button("Sincronizar Nuevos Formatos")
+            col_subida, col_consulta = st.columns(2)
+
+            # --- SUBIDA DE DOCUMENTOS (INGESTA) ---
+            with col_subida:
+                st.subheader("1. Subir Nueva Jurisprudencia")
+                archivo_pdf = st.file_uploader("Subir Fallo (PDF)", type="pdf", key="pdf_rag")
+                
+                meta_rol = st.text_input("Rol / RIT", placeholder="Ej: 1234-2024")
+                meta_tribunal = st.selectbox("Tribunal", ["Corte Suprema", "C. Apelaciones Santiago", "C. Apelaciones San Miguel", "TC", "Juzgado Garantía"])
+                meta_etiqueta = st.text_input("Tema / Etiqueta", placeholder="Ej: Nulidad, Prisión Preventiva, 25 ter")
+
+                if archivo_pdf and st.button("💾 Guardar en Memoria"):
+                    with st.spinner("Procesando documento e indexando..."):
+                        try:
+                            # 1. Leer PDF
+                            reader = PyPDF2.PdfReader(archivo_pdf)
+                            texto_completo = ""
+                            for page in reader.pages:
+                                texto_completo += page.extract_text()
+                            
+                            # 2. Fragmentar texto (Chunking) para no saturar la IA
+                            # Dividimos cada 1000 caracteres aprox para búsquedas precisas
+                            chunk_size = 1000
+                            chunks = [texto_completo[i:i+chunk_size] for i in range(0, len(texto_completo), chunk_size)]
+                            
+                            st.write(f"Documento dividido en {len(chunks)} fragmentos.")
+                            progress_bar = st.progress(0)
+
+                            # 3. Vectorizar y Guardar en Supabase
+                            for i, chunk in enumerate(chunks):
+                                # Generar Embedding con Gemini
+                                response = genai.embed_content(
+                                    model="models/text-embedding-004",
+                                    content=chunk,
+                                    task_type="retrieval_document"
+                                )
+                                vector = response['embedding']
+
+                                # Guardar en Supabase
+                                data_insert = {
+                                    "contenido": chunk,
+                                    "metadata": {
+                                        "rol": meta_rol,
+                                        "tribunal": meta_tribunal,
+                                        "tema": meta_etiqueta,
+                                        "origen": archivo_pdf.name
+                                    },
+                                    "embedding": vector
+                                }
+                                supabase.table("documentos_legales").insert(data_insert).execute()
+                                progress_bar.progress((i + 1) / len(chunks))
+                            
+                            st.success(f"✅ Fallo '{meta_rol}' indexado correctamente en la Base de Datos.")
+                            time.sleep(2)
+                            st.rerun()
+
+                        except Exception as e:
+                            st.error(f"Error indexando: {e}")
+
+            # --- VISTA DE DATOS ---
+            with col_consulta:
+                st.subheader("2. Fallos en el Sistema")
+                try:
+                    # Traemos solo metadata para no saturar (sin vector ni contenido pesado)
+                    res = supabase.table("documentos_legales").select("metadata, id").limit(10).execute()
+                    if res.data:
+                        # Procesamos para mostrar bonito en tabla
+                        tabla_fallos = []
+                        seen_rols = set() # Para no repetir fragmentos del mismo fallo
+                        
+                        for d in res.data:
+                            meta = d['metadata']
+                            rol = meta.get('rol', 'S/N')
+                            if rol not in seen_rols:
+                                tabla_fallos.append({
+                                    "Rol": rol,
+                                    "Tribunal": meta.get('tribunal', ''),
+                                    "Tema": meta.get('tema', '')
+                                })
+                                seen_rols.add(rol)
+                        
+                        st.dataframe(tabla_fallos, use_container_width=True)
+                        st.caption("Mostrando últimos fallos ingresados.")
+                    else:
+                        st.info("La base de datos está vacía.")
+                except Exception as e:
+                    st.error(f"Error conexión: {e}")
+
         else:
-            st.warning("Acceso Denegado")
+            st.warning("🔒 Acceso restringido a Administradores.")
+            st.info("Debes iniciar sesión con una cuenta autorizada.")
 
 if __name__ == "__main__":
     if st.session_state.logged_in:
