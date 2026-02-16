@@ -479,33 +479,64 @@ def login_screen():
         st.markdown("""
         <div class='login-wrapper'>
             <div class='login-container'>
-                <div class='login-title'>🏛️ ACCESO AL SISTEMA</div>
-                <p style='color:#757575; font-size:1.1rem;'>Plataforma Jurídica Automatizada IABL</p>
+                <div class='login-title'>🏛️ ACCESO AL SISTEMA IABL</div>
         """, unsafe_allow_html=True)
         
-        with st.form("login_form"):
-            email = st.text_input("Credencial de Acceso", placeholder="Ingresar correo")
-            password = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("🔐 INICIAR SESIÓN", use_container_width=True)
-            
-            if submitted:
-                user_found = next((u for u in st.session_state.db_users if u["email"] == email and u["pass"] == password), None)
-                if user_found:
-                    st.session_state.logged_in = True
-                    st.session_state.user_role = user_found["rol"]
-                    st.session_state.defensor_nombre = user_found["nombre"]
-                    st.rerun()
-                else:
-                    st.error("❌ Credenciales inválidas")
-        
-        st.markdown("""
-                <div class='login-subtitle'>
-                    "Acceso a sistema jurídico con herramientas automatizadas pensada en Defensores,<br>
-                    porque tu tiempo vale, la salud y la satisfacción del trabajo bien hecho."
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Pestañas para Login o Registro
+        tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
+
+        # --- LOGIN ---
+        with tab_login:
+            with st.form("login_form"):
+                email = st.text_input("Correo Electrónico")
+                password = st.text_input("Contraseña", type="password")
+                submitted = st.form_submit_button("INGRESAR", use_container_width=True)
+                
+                if submitted:
+                    try:
+                        # 1. Intentar Login con Supabase
+                        session = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        user = session.user
+                        
+                        # 2. Si entra, consultamos su ROL en la tabla 'profiles' que creamos
+                        data = supabase.table("profiles").select("*").eq("id", user.id).execute()
+                        
+                        if data.data:
+                            perfil = data.data[0]
+                            st.session_state.logged_in = True
+                            st.session_state.user_role = perfil['rol'] # Admin o User
+                            st.session_state.defensor_nombre = perfil['nombre']
+                            st.session_state.user_email = email
+                            st.success("¡Bienvenido!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Error: Usuario autenticado pero sin perfil.")
+                            
+                    except Exception as e:
+                        st.error(f"Credenciales incorrectas o error de conexión: {e}")
+
+        # --- REGISTRO (Solo para nuevos usuarios) ---
+        with tab_registro:
+            with st.form("register_form"):
+                new_email = st.text_input("Tu Correo")
+                new_pass = st.text_input("Crear Contraseña", type="password")
+                new_name = st.text_input("Nombre Completo (Para los escritos)")
+                reg_submit = st.form_submit_button("REGISTRARSE", use_container_width=True)
+                
+                if reg_submit:
+                    try:
+                        # Esto crea el usuario y dispara el Trigger SQL que hicimos
+                        response = supabase.auth.sign_up({
+                            "email": new_email, 
+                            "password": new_pass,
+                            "options": {"data": {"nombre": new_name}}
+                        })
+                        st.success("✅ Cuenta creada. Revisa tu correo o intenta iniciar sesión.")
+                    except Exception as e:
+                        st.error(f"Error al registrar: {e}")
+
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
 # =============================================================================
 # 8. CÁLCULO PENAL AVANZADO (LÓGICA JURÍDICA MATEMÁTICA)
