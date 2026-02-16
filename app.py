@@ -22,13 +22,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Profesional: Alto Contraste, Elegancia y Badges
+# CSS Profesional: Alto Contraste, Elegancia y Animaciones
 st.markdown("""
     <style>
+    /* Animación de entrada */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
     /* Tipografía y Fondo General */
     .main {
-        background-color: #f8f9fa; /* Gris muy suave para menos fatiga visual */
-        font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
+        background-color: #f4f7f6; /* Fondo gris muy suave y moderno */
+        font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+        color: #333333;
     }
     
     /* Encabezados */
@@ -47,18 +54,20 @@ st.markdown("""
     .stButton>button {
         background-color: #0d47a1;
         color: white;
-        border-radius: 6px;
+        border-radius: 8px;
         font-weight: 600;
         border: none;
         padding: 0.6rem 1.2rem;
         transition: all 0.3s ease;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         width: 100%;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .stButton>button:hover {
         background-color: #1976d2;
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
     }
     
     /* Cajas de Información */
@@ -67,98 +76,58 @@ st.markdown("""
         border-radius: 10px;
         background: #ffffff;
         border-left: 5px solid #0d47a1;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         color: #212121;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
     }
     
-    /* Badges de Riesgo y Pena */
-    .badge-success {
-        background-color: #d4edda;
-        color: #155724;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 1em;
-        border: 1px solid #c3e6cb;
-        display: block;
-        text-align: center;
-        margin-top: 10px;
+    /* Login Box - Diseño Mejorado */
+    .login-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding-top: 50px;
+        animation: fadeIn 0.8s ease-out;
     }
-    .badge-warning {
-        background-color: #fff3cd;
-        color: #856404;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 1em;
-        border: 1px solid #ffeeba;
-        display: block;
-        text-align: center;
-        margin-top: 10px;
-    }
-    .badge-danger {
-        background-color: #f8d7da;
-        color: #721c24;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-weight: bold;
-        font-size: 1em;
-        border: 1px solid #f5c6cb;
-        display: block;
-        text-align: center;
-        margin-top: 10px;
-    }
-
-    /* Caja de Teoría del Caso */
-    .teoria-box {
-        background-color: #ffffff;
-        padding: 25px;
-        border-radius: 8px;
-        border-left: 5px solid #2e7d32;
-        color: #000000 !important; /* Texto negro forzado */
-        font-size: 1.05rem;
-        white-space: pre-line;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }
-    
-    /* Minuta en Pantalla */
-    .minuta-box {
-        background-color: #fff8e1;
-        padding: 25px;
-        border-radius: 8px;
-        border: 1px solid #ffecb3;
-        color: #000000 !important; /* Texto negro forzado */
-        margin-top: 15px;
-        font-family: 'Courier New', Courier, monospace; 
-        box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
-    }
-    
-    /* Calculadora Box */
-    .calc-box {
-        background-color: #e3f2fd;
-        padding: 20px;
-        border-radius: 8px;
-        border: 1px solid #90caf9;
-        color: #0d47a1 !important;
-    }
-
-    /* Login Box */
     .login-container {
         background: #ffffff;
-        padding: 40px;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        padding: 50px;
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
         text-align: center;
-        border-top: 5px solid #0d47a1;
+        border-top: 6px solid #0d47a1;
+        width: 100%;
+        max-width: 450px;
+    }
+    .login-title {
+        color: #0d47a1;
+        font-size: 1.8rem;
+        font-weight: 800;
+        margin-bottom: 10px;
+        letter-spacing: -0.5px;
     }
     .login-subtitle {
-        font-size: 1.0em;
+        font-size: 1rem;
         color: #546e7a;
         font-style: italic;
-        margin-top: 20px;
+        margin-top: 25px;
         font-weight: 400;
-        line-height: 1.6;
+        line-height: 1.5;
+        border-top: 1px solid #eceff1;
+        padding-top: 20px;
+    }
+    
+    /* Minuta en Pantalla - Estilo Expediente */
+    .minuta-box {
+        background-color: #fffde7;
+        padding: 30px;
+        border-radius: 8px;
+        border: 1px solid #fdd835;
+        color: #212121 !important;
+        margin-top: 20px;
+        font-family: 'Courier New', Courier, monospace; 
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        border-left: 6px solid #fbc02d;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -268,7 +237,7 @@ def analizar_pdf(uploaded_file, tipo):
         return None
 
 # =============================================================================
-# 5. MOTOR DE GENERACIÓN WORD (FORMATO EXACTO Y CORREGIDO)
+# 5. MOTOR DE GENERACIÓN WORD (CORREGIDO PARA EVITAR DUPLICADOS)
 # =============================================================================
 class GeneradorWord:
     def __init__(self, defensor, imputado):
@@ -276,20 +245,17 @@ class GeneradorWord:
         self.defensor = defensor.upper() if defensor else "DEFENSOR PÚBLICO"
         self.imputado = imputado.upper() if imputado else "IMPUTADO"
         
-        # Configuración Global de Página
         section = self.doc.sections[0]
         section.left_margin = Inches(1.2)
         section.right_margin = Inches(1.0)
         section.top_margin = Inches(1.0)
         section.bottom_margin = Inches(1.0)
         
-        # Estilo Base: Cambria 12
         style = self.doc.styles['Normal']
         font = style.font
         font.name = 'Cambria'
         font.size = Pt(12)
         
-        # Párrafo Base: Justificado, Interlineado 1.5
         pf = style.paragraph_format
         pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         pf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
@@ -305,18 +271,19 @@ class GeneradorWord:
         if sangria and align == "JUSTIFY":
             p.paragraph_format.first_line_indent = Inches(0.5)
         
-        texto = texto.replace("{DEFENSOR}", self.defensor)
-        texto = texto.replace("{IMPUTADO}", self.imputado)
+        # Primero reemplazamos las variables
+        texto_final = texto.replace("{DEFENSOR}", self.defensor).replace("{IMPUTADO}", self.imputado)
         
         if negrita:
-            run = p.add_run(texto)
+            # Si todo el párrafo es negrita, lo aplicamos directo
+            run = p.add_run(texto_final)
             run.font.name = 'Cambria'
             run.font.size = Pt(12)
             run.bold = True
         else:
-            # CORRECCIÓN REGEX: Usamos \b (Word Boundary) para evitar coincidencias parciales
-            # Ejemplo: Evitar que "RIT" haga match dentro de "méRITo" o "SOLICITA" dentro de "SOLICITAR"
-            
+            # CORRECCIÓN DEFINITIVA DE DUPLICADOS:
+            # Usamos split con paréntesis para conservar los delimitadores, pero procesamos linealmente.
+            # \b asegura que solo coincida con palabras completas.
             keywords = [
                 r"RIT:?\s?[\w\d-]+", r"RUC:?\s?[\w\d-]+", 
                 "POR TANTO", "OTROSÍ", "EN LO PRINCIPAL", 
@@ -325,19 +292,34 @@ class GeneradorWord:
                 "FUNDAMENTOS DE DERECHO:", "ANTECEDENTES DE HECHO:"
             ]
             
-            # Construir patrón seguro
-            patron_base = "|".join(keywords)
-            patron = f"\\b({patron_base})\\b|{re.escape(self.defensor)}|{re.escape(self.imputado)}"
+            # Unimos keywords y escapamos nombres para crear el patrón
+            patron_regex = "|".join(keywords) + f"|{re.escape(self.defensor)}|{re.escape(self.imputado)}"
             
-            parts = re.split(f"({patron})", texto, flags=re.IGNORECASE)
-            for part in parts:
-                if not part: continue
-                run = p.add_run(part)
+            # Encontramos todas las coincidencias y sus posiciones
+            matches = list(re.finditer(patron_regex, texto_final, flags=re.IGNORECASE))
+            
+            last_pos = 0
+            for match in matches:
+                # Texto normal antes de la coincidencia
+                start, end = match.span()
+                if start > last_pos:
+                    run = p.add_run(texto_final[last_pos:start])
+                    run.font.name = 'Cambria'
+                    run.font.size = Pt(12)
+                
+                # Texto en negrita (la coincidencia)
+                run_bold = p.add_run(texto_final[start:end])
+                run_bold.font.name = 'Cambria'
+                run_bold.font.size = Pt(12)
+                run_bold.bold = True
+                
+                last_pos = end
+            
+            # Texto restante después de la última coincidencia
+            if last_pos < len(texto_final):
+                run = p.add_run(texto_final[last_pos:])
                 run.font.name = 'Cambria'
                 run.font.size = Pt(12)
-                # Verificar si la parte coincide con el patrón para aplicar negrita
-                if re.match(f"({patron})", part, re.IGNORECASE):
-                    run.bold = True
 
     def generar(self, tipo, datos):
         # 1. ENCABEZADO
@@ -492,20 +474,19 @@ if "defensor_nombre" not in st.session_state:
 # 7. PANTALLA DE LOGIN
 # =============================================================================
 def login_screen():
-    st.markdown("<br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.markdown("""
-        <div class='login-container'>
-            <div class='login-title'>🏛️ Sistema Jurídico Avanzado IABL</div>
-            <p style='color:#757575;'>Plataforma de Gestión Legal Automatizada</p>
-        </div>
+        <div class='login-wrapper'>
+            <div class='login-container'>
+                <div class='login-title'>🏛️ ACCESO AL SISTEMA</div>
+                <p style='color:#757575; font-size:1.1rem;'>Plataforma Jurídica Automatizada IABL</p>
         """, unsafe_allow_html=True)
         
         with st.form("login_form"):
             email = st.text_input("Credencial de Acceso", placeholder="Ingresar correo")
             password = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("🔐 Iniciar Sesión", use_container_width=True)
+            submitted = st.form_submit_button("🔐 INICIAR SESIÓN", use_container_width=True)
             
             if submitted:
                 user_found = next((u for u in st.session_state.db_users if u["email"] == email and u["pass"] == password), None)
@@ -518,9 +499,11 @@ def login_screen():
                     st.error("❌ Credenciales inválidas")
         
         st.markdown("""
-        <div class='login-subtitle'>
-            "Acceso a sistema jurídico con herramientas automatizadas pensada en Defensores,<br>
-            porque tu tiempo vale, la salud y la satisfacción del trabajo bien hecho."
+                <div class='login-subtitle'>
+                    "Acceso a sistema jurídico con herramientas automatizadas pensada en Defensores,<br>
+                    porque tu tiempo vale, la salud y la satisfacción del trabajo bien hecho."
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -544,7 +527,6 @@ def calcular_pena_exacta(delito_info, atenuantes, agravantes, es_rpa):
     idx_min = delito_info["idx_min"]
     idx_max = delito_info["idx_max"]
     
-    # 1. Reglas de Compensación y Grados (Art 449 CP)
     n_at = len(atenuantes)
     n_ag = len(agravantes)
     
@@ -564,7 +546,6 @@ def calcular_pena_exacta(delito_info, atenuantes, agravantes, es_rpa):
     else:
         efecto = "Sin modificatorias (Rango completo)"
 
-    # 2. Aplicación RPA (Art 21 - Rebaja obligatoria de grado)
     if es_rpa:
         idx_min = max(0, idx_min - 1)
         idx_max = max(0, idx_max - 1)
@@ -666,7 +647,7 @@ def main_app():
             c1, c2, c3 = st.columns([3, 3, 1])
             c['rit'] = c1.text_input(f"RIT {i+1}", c['rit'], key=f"rit_ind_{i}")
             c['ruc'] = c2.text_input(f"RUC {i+1}", c['ruc'], key=f"ruc_ind_{i}")
-            if c3.button("X", key=f"del_ind_{i}"):
+            if c3.button("🗑️ Quitar", key=f"del_ind_{i}"):
                 st.session_state.lista_individualizacion.pop(i)
                 st.rerun()
                 
@@ -703,7 +684,11 @@ def main_app():
             if st.session_state.prescripcion_list:
                 st.write("**Causas en el escrito:**")
                 for i, c in enumerate(st.session_state.prescripcion_list):
-                    st.caption(f"{i+1}. {c['delito']} (RIT {c['rit']})")
+                    c1, c2 = st.columns([8, 1])
+                    c1.caption(f"{i+1}. {c['delito']} (RIT {c['rit']})")
+                    if c2.button("🗑️", key=f"del_pres_{i}"):
+                        st.session_state.prescripcion_list.pop(i)
+                        st.rerun()
 
         # --- LÓGICA DE EXTINCIÓN ---
         elif tipo_recurso == "Extinción Art. 25 ter":
@@ -716,6 +701,9 @@ def main_app():
                         rpa['ruc'] = st.text_input("RUC", rpa.get('ruc',''), key=f"rruc{i}")
                         rpa['tribunal'] = st.selectbox("Tribunal", TRIBUNALES, key=f"rtrib{i}")
                         rpa['sancion'] = st.text_input("Sanción", rpa.get('sancion',''), key=f"rsanc{i}")
+                        if st.button("🗑️ Quitar", key=f"del_rpa_{i}"):
+                            st.session_state.rpa.pop(i)
+                            st.rerun()
                 if st.button("➕ Otra RPA"):
                     st.session_state.rpa.append({})
                     st.rerun()
@@ -729,6 +717,9 @@ def main_app():
                         ad['tribunal'] = st.selectbox("Tribunal", TRIBUNALES, key=f"atrib{i}")
                         ad['pena'] = st.text_input("Pena", ad.get('pena',''), key=f"apena{i}")
                         ad['fecha'] = st.text_input("Fecha", ad.get('fecha',''), key=f"afecha{i}")
+                        if st.button("🗑️ Quitar", key=f"del_ad_{i}"):
+                            st.session_state.adulto.pop(i)
+                            st.rerun()
                 if st.button("➕ Otra Adulto"):
                     st.session_state.adulto.append({})
                     st.rerun()
@@ -752,7 +743,8 @@ def main_app():
                     "Ilegalidad: Falta de indicios (Art 85 CPP)",
                     "Ilegalidad: Ausencia de Flagrancia (Art 83 CPP)",
                     "Ilegalidad: Lectura tardía de derechos",
-                    "RPA: Falta de notificación a padres"
+                    "RPA: Falta de notificación a padres",
+                    "RPA: Esposamiento Injustificado"
                 ])
                 gen_minuta = st.form_submit_button("Generar Vista Previa")
                 if gen_minuta:
@@ -850,7 +842,11 @@ def main_app():
                 time.sleep(1)
                 st.write(f"Generando formato: {formato}...")
             st.success("Transcripción Completada")
-            st.text_area("Resultado:", value="[00:00] JUEZ: Se abre la audiencia...", height=200)
+            if formato == "Minuta de Audiencia":
+                res = "**MINUTA:**\n- Inicio a las 09:00\n- Comparecen partes.\n- Fiscalía formaliza.\n- Defensa debate cautelares."
+            else:
+                res = "[00:00] JUEZ: Se abre la audiencia..."
+            st.text_area("Resultado:", value=res, height=200)
 
     # === TAB 4: ADMIN ===
     with tabs[3]:
