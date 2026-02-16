@@ -11,6 +11,8 @@ from supabase import create_client
 import google.generativeai as genai
 import time
 import random
+import tempfile # Nueva dependencia agregada
+import os       # Nueva dependencia agregada
 
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
@@ -853,31 +855,70 @@ def main_app():
 
     # === TAB 3: TRANSCRIPTOR ===
     with tabs[2]:
-        st.header("🎙️ Transcriptor Forense")
-        st.info("Módulo de transcripción activado. Soporte para MP3, WAV, M4A.")
-        
-        # RESTAURACIÓN DE CONTROLES COMPLETOS
-        c1, c2 = st.columns(2)
-        idioma = c1.selectbox("Idioma Audio", ["Español (Chile)", "Español (Neutro)", "Inglés"])
-        formato = c2.selectbox("Formato Salida", ["Transcripción Literal (Verbatim)", "Resumen Jurídico", "Minuta de Audiencia"])
-        
-        c3, c4 = st.columns(2)
-        diarizacion = c3.checkbox("Identificar Hablantes (Diarización)", value=True)
-        timestamps = c4.checkbox("Incluir Marcas de Tiempo", value=True)
-        
-        uploaded_audio = st.file_uploader("Cargar Audio", type=["mp3", "wav", "m4a"])
-        if uploaded_audio and st.button("Iniciar Transcripción"):
-            with st.status("Procesando...", expanded=True):
-                time.sleep(1)
-                st.write("Identificando hablantes...")
-                time.sleep(1)
-                st.write(f"Generando formato: {formato}...")
-            st.success("Transcripción Completada")
-            if formato == "Minuta de Audiencia":
-                res = "**MINUTA:**\n- Inicio a las 09:00\n- Comparecen partes.\n- Fiscalía formaliza.\n- Defensa debate cautelares."
-            else:
-                res = "[00:00] JUEZ: Se abre la audiencia..."
-            st.text_area("Resultado:", value=res, height=200)
+        st.header("🎙️ Transcriptor Forense & Generador de Recursos")
+        st.info("Sube el audio de la audiencia (MP3, WAV, M4A) para obtener la transcripción literal y un borrador de recurso inteligente.")
+
+        uploaded_audio = st.file_uploader("Cargar Audio de Audiencia", type=["mp3", "wav", "m4a", "ogg"])
+
+        if uploaded_audio is not None:
+            if st.button("🚀 PROCESAR AUDIO CON GEMINI 1.5 FLASH"):
+                with st.spinner("🔊 Escuchando y redactando... (Esto puede tardar unos segundos)"):
+                    try:
+                        # 1. Guardar temporalmente
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_audio.name.split('.')[-1]}") as tmp_file:
+                            tmp_file.write(uploaded_audio.getvalue())
+                            tmp_path = tmp_file.name
+
+                        # 2. Subir a Gemini
+                        archivo_gemini = genai.upload_file(tmp_path)
+
+                        # 3. Configurar Modelo
+                        model_transcriptor = genai.GenerativeModel('gemini-1.5-flash')
+
+                        # 4. Prompt Exacto
+                        prompt_transcripcion = """
+                        Actúa como un Estenógrafo Judicial y un Abogado Experto en Recursos Penales. Tu tarea tiene dos partes OBLIGATORIAS basadas en el audio de la audiencia:
+
+                        PARTE 1: TRANSCRIPCIÓN LITERAL COMPLETA
+                        - Transcribe TODO lo que se dice en la audiencia.
+                        - Identifica claramente a los intervinientes: JUEZ, FISCALÍA, DEFENSA, IMPUTADO.
+                        - No resumas. Quiero el debate completo, palabra por palabra.
+
+                        PARTE 2: BORRADOR DE RECURSO PROCESAL (Inteligente)
+                        - Basándote en la transcripción anterior, redacta un BORRADOR DE RECURSO (Apelación o Amparo) contra la resolución del tribunal.
+                        - ESTRUCTURA DEL RECURSO:
+                          a) La Resolución Impugnada: Cita textual de lo que resolvió el Juez.
+                          b) Argumentos de la Defensa: Retoma lo que la defensa alegó en el audio y que fue desestimado.
+                          c) Argumentos de la Fiscalía: Menciona en qué se basó la fiscalía.
+                          d) El Agravio: Explica por qué la decisión del juez es errónea frente a los argumentos de la defensa.
+                          e) Petitorio Concreto.
+                        """
+
+                        # 5. Generar
+                        response = model_transcriptor.generate_content([prompt_transcripcion, archivo_gemini])
+                        texto_generado = response.text
+
+                        # 6. Mostrar Resultados
+                        st.success("✅ Procesamiento Completado")
+                        st.subheader("📄 Resultado del Análisis")
+                        st.markdown(texto_generado)
+
+                        # 7. Botón Descarga
+                        st.download_button(
+                            label="📥 Descargar Transcripción y Recurso",
+                            data=texto_generado,
+                            file_name="Transcripcion_y_Recurso.txt",
+                            mime="text/plain"
+                        )
+
+                    except Exception as e:
+                        st.error(f"Ocurrió un error al procesar el audio: {str(e)}")
+                    finally:
+                        # 8. Limpieza
+                        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                            os.remove(tmp_path)
+        else:
+            st.warning("Por favor, carga un archivo de audio para comenzar.")
 
     # === TAB 4: ADMIN ===
     with tabs[3]:
