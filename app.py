@@ -920,25 +920,44 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: ADMIN ===
+    # === TAB 4: ADMIN (ACTUALIZADO CON SUPABASE REAL) ===
     with tabs[3]:
         if st.session_state.user_role == "Admin":
-            st.header("Panel de Control & Base de Datos")
-            with st.expander("👥 Gestión de Usuarios"):
-                with st.form("add_user"):
-                    u_nom = st.text_input("Nombre")
-                    u_mail = st.text_input("Email")
-                    u_pass = st.text_input("Pass", type="password")
-                    u_rol = st.selectbox("Rol", ["User", "Admin"])
-                    if st.form_submit_button("Crear"):
-                        st.session_state.db_users.append({"email": u_mail, "pass": u_pass, "rol": u_rol, "nombre": u_nom})
-                        st.success("Creado")
-                for i, u in enumerate(st.session_state.db_users):
-                    c1, c2, c3 = st.columns([3, 2, 1])
-                    c1.write(f"{u['nombre']} ({u['rol']})")
-                    if c3.button("Eliminar", key=f"del_{i}"):
-                        st.session_state.db_users.pop(i)
-                        st.rerun()
+            st.header("Panel de Control & Base de Datos (Supabase)")
+            
+            # --- SECCIÓN: GESTIÓN DE USUARIOS (REAL) ---
+            with st.expander("👥 Usuarios Registrados (Tabla 'profiles')", expanded=True):
+                try:
+                    # Consulta Real a Supabase
+                    response = supabase.table("profiles").select("*").execute()
+                    users_data = response.data
+                    
+                    if users_data:
+                        st.success(f"Conexión exitosa. Se encontraron {len(users_data)} usuarios.")
+                        
+                        # Mostramos los datos en un Dataframe interactivo
+                        # Preparamos los datos para que se vean bien
+                        clean_data = []
+                        for u in users_data:
+                            clean_data.append({
+                                "Nombre": u.get("nombre", "Sin Nombre"),
+                                "Rol": u.get("rol", "N/A"),
+                                "ID/Email": u.get("email", u.get("id", "N/A")), # Fallback si no hay columna email
+                                "Fecha Registro": u.get("created_at", "")
+                            })
+                        
+                        st.dataframe(clean_data, use_container_width=True)
+                        
+                        st.markdown("---")
+                        st.caption("Nota: Para eliminar usuarios, se recomienda usar el Dashboard de Supabase para mantener la integridad de Auth.")
+                    else:
+                        st.warning("La tabla 'profiles' está vacía o no se pudo leer.")
+                        
+                except Exception as e:
+                    st.error(f"Error al consultar Supabase: {e}")
+                    st.code("Verifica que la tabla 'profiles' tenga permisos de lectura (RLS) o que la API Key sea correcta.")
+
+            # --- SECCIÓN: CONSULTAS (Mantenemos lo visual) ---
             with st.expander("📚 Base de Jurisprudencia (Supabase)"):
                 st.text_input("Buscar Fallo (Rol / Tema)")
                 st.button("🔍 Consultar Base Remota")
