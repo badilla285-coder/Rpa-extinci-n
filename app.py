@@ -84,6 +84,55 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
+    /* LOGIN HERO CSS */
+    .login-container {
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .hero-title {
+        color: #0d47a1;
+        font-weight: 800;
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        text-align: center;
+    }
+    .hero-subtitle {
+        font-size: 1.2rem;
+        color: #455A64;
+        margin-bottom: 30px;
+        font-style: italic;
+        text-align: center;
+        line-height: 1.6;
+    }
+    .feature-card {
+        background: white;
+        border: 1px solid #E0E0E0;
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s;
+        height: 100%;
+    }
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+    .feature-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+    .feature-title {
+        font-weight: 700;
+        color: #1565c0;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
     /* Minuta en Pantalla - Estilo Expediente */
     .minuta-box {
         background-color: #fffde7;
@@ -97,13 +146,35 @@ st.markdown("""
         border-left: 6px solid #fbc02d;
     }
     
-    /* Estilo para el resumen dinámico */
+    /* Estilo para el resumen dinámico y respuestas jurídicas */
     .resumen-dinamico {
         background-color: #e3f2fd;
         border-left: 5px solid #1976d2;
-        padding: 15px;
-        border-radius: 5px;
+        padding: 20px;
+        border-radius: 8px;
         margin-bottom: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* Badges para Biblioteca */
+    .badge-tipo {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: 1px solid #c8e6c9;
+    }
+    .badge-rol {
+        background-color: #e3f2fd;
+        color: #1565c0;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-left: 5px;
+        border: 1px solid #bbdefb;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -130,13 +201,12 @@ def get_generative_model_dinamico():
         mejor = next((m for m in modelos if 'gemini-1.5-flash' in m), None)
         if not mejor:
             mejor = next((m for m in modelos if 'gemini-1.5-pro' in m), modelos[0])
-        # print(f"DEBUG: Usando modelo generativo: {mejor}") # Opcional
         return genai.GenerativeModel(mejor)
     except Exception as e:
         # Fallback de emergencia por si la lista falla
         return genai.GenerativeModel('models/gemini-1.5-flash-latest')
 
-# Instancia global inicial (para compatibilidad con funciones antiguas del Tab 1)
+# Instancia global inicial
 model_ia = get_generative_model_dinamico()
 
 # === LÓGICA DE DETECCIÓN AUTOMÁTICA DE MODELO DE EMBEDDING ===
@@ -149,57 +219,50 @@ def get_embedding_model():
         return MODELO_EMBEDDING_ACTUAL
 
     try:
-        # Listar todos los modelos y buscar uno que soporte 'embedContent'
         modelos = list(genai.list_models())
-        
-        # 1. Preferencia por text-embedding-004
         for m in modelos:
             if 'embedContent' in m.supported_generation_methods:
                 if 'text-embedding-004' in m.name:
                     MODELO_EMBEDDING_ACTUAL = m.name
                     return m.name
-        
-        # 2. Si no, cualquiera que soporte embeddings
         for m in modelos:
             if 'embedContent' in m.supported_generation_methods:
                 MODELO_EMBEDDING_ACTUAL = m.name
                 return m.name
-        
-        # 3. Fallback hardcoded si la lista falla
         return 'models/text-embedding-004'
-        
     except Exception as e:
         return 'models/text-embedding-004'
 
-# === FUNCIÓN PARA METADATA PROFUNDA (ACTUALIZADA) ===
+# === FUNCIÓN PARA METADATA PROFUNDA (ACTUALIZADA LISTA CERRADA) ===
 def analizar_metadata_profunda(texto_completo):
     """Usa IA para extraer metadata precisa del texto completo del documento."""
     try:
         prompt = f"""
         Eres un Actuario Judicial experto. Lee este documento legal COMPLETO. 
-        Extrae con precisión quirúrgica un JSON válido con los siguientes campos:
+        Extrae con precisión quirúrgica un JSON válido con los siguientes campos.
+        
+        IMPORTANTE: El campo 'tipo' debe ser ESTRICTAMENTE uno de estos valores:
+        ["Sentencia Condenatoria", "Sentencia Absolutoria", "Recurso de Nulidad", "Recurso de Amparo", "Recurso de Apelación", "Doctrina/Artículo", "Ley/Normativa"].
+        
+        JSON REQUERIDO:
         {{
-            "tribunal": "Nombre exacto del tribunal (ej: 7 Juzgado de Garantía de Santiago)",
+            "tribunal": "Nombre exacto del tribunal (ej: Corte de Apelaciones de Santiago)",
             "rol": "RIT o Rol de la causa (ej: 450-2023)",
             "fecha_sentencia": "Fecha del documento o sentencia (YYYY-MM-DD) o 'S/F'",
-            "resultado": "Resumen muy breve (ej: Condenatoria, Absolutoria, Acoge Recurso)",
-            "tema": "Palabras clave del tema jurídico (ej: Nulidad, Prisión Preventiva)",
-            "tipo": "Tipo de documento (Jurisprudencia, Ley, Doctrina)"
+            "resultado": "Resumen muy breve (ej: Acoge Recurso, Rechaza Nulidad)",
+            "tema": "Palabras clave del tema jurídico (ej: Indicios Art 85, Prisión Preventiva)",
+            "tipo": "Uno de la lista cerrada anterior"
         }}
         
-        TEXTO DEL DOCUMENTO (Primeros 15000 caracteres):
-        {texto_completo[:15000]}
+        TEXTO DEL DOCUMENTO (Primeros 20000 caracteres):
+        {texto_completo[:20000]}
         """
         
-        # CAMBIO 2: USO DE MODELO DINÁMICO
         model = get_generative_model_dinamico()
-
-        # Forzamos respuesta JSON limpia
         resp = model.generate_content(prompt)
         clean_json = resp.text.replace('```json', '').replace('```', '').strip()
         return json.loads(clean_json)
     except Exception as e:
-        # Fallback en caso de error de IA
         return {
             "tribunal": "Desconocido/Error IA",
             "rol": "S/N",
@@ -242,7 +305,6 @@ TIPOS_RECURSOS = [
     "Prescripción de la Pena",
     "Amparo Constitucional",
     "Apelación por Quebrantamiento"
-    # "Minuta Control de Detención" -> ELIMINADO DEL MENÚ
 ]
 
 # Escala de Penas (Grados) para cálculo matemático
@@ -379,8 +441,7 @@ class GeneradorWord:
             "Extinción Art. 25 ter": "EN LO PRINCIPAL: SOLICITA EXTINCIÓN; OTROSÍ: ACOMPAÑA DOCUMENTO.",
             "Prescripción de la Pena": "EN LO PRINCIPAL: Solicita Audiencia de Prescripción; OTROSÍ: Oficia a extranjería y se remita extracto de filiación y antecedentes.",
             "Amparo Constitucional": "EN LO PRINCIPAL: ACCIÓN CONSTITUCIONAL DE AMPARO; OTROSÍ: ORDEN DE NO INNOVAR.",
-            "Apelación por Quebrantamiento": "EN LO PRINCIPAL: INTERPONE RECURSO DE APELACIÓN; OTROSÍ: FORMA DE NOTIFICACIÓN.",
-            "Minuta Control de Detención": "MINUTA DE AUDIENCIA: CONTROL DE DETENCIÓN"
+            "Apelación por Quebrantamiento": "EN LO PRINCIPAL: INTERPONE RECURSO DE APELACIÓN; OTROSÍ: FORMA DE NOTIFICACIÓN."
         }
         self.add_parrafo(sumas.get(tipo, "SOLICITUD"), negrita=True, align="LEFT", sangria=False)
         self.doc.add_paragraph() 
@@ -404,7 +465,6 @@ class GeneradorWord:
             if causas_txts:
                 causas_str = ", en las causas " + "; ".join(causas_txts) + ","
         elif tipo == "Apelación por Quebrantamiento":
-            # Para Apelación usamos los campos específicos si están llenos
             rit_ap = datos.get('rit_ap', '')
             ruc_ap = datos.get('ruc_ap', '')
             if rit_ap:
@@ -476,6 +536,8 @@ class GeneradorWord:
         elif tipo == "Apelación por Quebrantamiento":
             self.add_parrafo("Que encontrándome dentro del plazo legal, vengo en interponer recurso de apelación en contra de la resolución que ordenó el quebrantamiento definitivo de la sanción de mi representado, solicitando se revoque y se mantenga la sanción original en el medio libre o se decrete un quebrantamiento parcial.")
             self.add_parrafo("I. HECHOS:", negrita=True)
+            self.add_parrafo(datos.get('hechos_quebrantamiento', 'No especificados'))
+            
             self.add_parrafo("RESOLUCIÓN IMPUGNADA:", negrita=True)
             self.add_parrafo(datos.get('resolucion_tribunal', 'No especificada'))
             self.add_parrafo("ARGUMENTOS DE LA DEFENSA:", negrita=True)
@@ -603,8 +665,8 @@ def login_screen():
     c1, c2, c3 = st.columns([1, 1.5, 1])
     
     with c2:
-        # Título del formulario específico solicitado
-        st.markdown("<h3 style='text-align: center; color: #161B2F; margin-bottom: 20px;'>ACCESO A SISTEMA JURIDICO AVANZADO</h3>", unsafe_allow_html=True)
+        # Título del formulario específico solicitado (CON TILDE)
+        st.markdown("<h3 style='text-align: center; color: #161B2F; margin-bottom: 20px;'>ACCESO A SISTEMA JURÍDICO AVANZADO</h3>", unsafe_allow_html=True)
         
         tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
         
@@ -813,25 +875,17 @@ def main_app():
     # === TAB 1: GENERADOR ===
     with tabs[0]:
         st.markdown("### 1. Individualización")
-        col_def, col_imp = st.columns(2)
         
-        # Implementación de "Borrar Campo" (X pequeña) usando columnas
-        def clear_field(key):
-            st.session_state[key] = ""
-
-        # Defensor
-        c_d1, c_d2 = c_def_cols = col_def.columns([0.9, 0.1])
-        st.session_state.defensor_nombre = c_d1.text_input("Defensor/a", value=st.session_state.defensor_nombre, key="input_defensor")
-        if c_d2.button("✖️", key="btn_clear_def", help="Borrar Defensor"):
+        # Botón de Limpieza General
+        if st.button("🧼 Limpiar Todos los Campos", type="secondary"):
             st.session_state.defensor_nombre = ""
+            st.session_state.imputado = ""
+            st.session_state.lista_individualizacion = []
             st.rerun()
 
-        # Imputado
-        c_i1, c_i2 = col_imp.columns([0.9, 0.1])
-        st.session_state.imputado = c_i1.text_input("Imputado/a", value=st.session_state.imputado, key="input_imputado")
-        if c_i2.button("✖️", key="btn_clear_imp", help="Borrar Imputado"):
-            st.session_state.imputado = ""
-            st.rerun()
+        col_def, col_imp = st.columns(2)
+        st.session_state.defensor_nombre = col_def.text_input("Defensor/a", value=st.session_state.defensor_nombre)
+        st.session_state.imputado = col_imp.text_input("Imputado/a", value=st.session_state.imputado)
         
         st.markdown("**Causas Individualizadas:**")
         for i, c in enumerate(st.session_state.lista_individualizacion):
@@ -921,18 +975,41 @@ def main_app():
             rit_ap = col_ap1.text_input("RIT Causa Apelación")
             ruc_ap = col_ap2.text_input("RUC Causa Apelación")
             
-            resolucion_tribunal = st.text_area("Resolución del Tribunal (Que se impugna)", height=100)
-            argumentos_defensa = st.text_area("Argumentos Defensa (Transcripción)", height=100)
+            # CAMBIO: Agregado campo HECHOS
+            hechos_quebrantamiento = st.text_area("Hechos del Quebrantamiento", height=100, placeholder="Describa brevemente qué ocurrió...")
             
+            resolucion_tribunal = st.text_area("Resolución del Tribunal (Que se impugna)", height=100)
+            
+            # CAMBIO: Refuerzo IA para Argumentos
+            argumentos_defensa = st.text_area("Argumentos Defensa (Borrador)", height=100)
+            if st.button("✨ Robustecer Argumentos con IA"):
+                with st.spinner("Mejorando argumentación jurídica..."):
+                    try:
+                        model_ia = get_generative_model_dinamico()
+                        prompt_arg = f"""
+                        Actúa como Abogado Defensor Penal experto.
+                        Mejora y robustece estos argumentos para una Apelación por Quebrantamiento:
+                        "{argumentos_defensa}"
+                        
+                        Usa terminología jurídica precisa, cita principios (proporcionalidad, interés superior adolescente) y mantén un tono persuasivo pero formal.
+                        Solo entrega el texto mejorado.
+                        """
+                        resp_arg = model_ia.generate_content(prompt_arg)
+                        argumentos_defensa = resp_arg.text
+                        st.success("Argumentos mejorados. Copia y pega si es necesario.")
+                        st.text_area("Argumentos Mejorados (Copia de aquí)", value=argumentos_defensa, height=150)
+                    except Exception as e:
+                        st.error(f"Error IA: {e}")
+
             antecedentes_sociales = st.text_area("Antecedentes Sociales (Opcional)", height=80, placeholder="Educacional, Laboral, Familiar...")
             
             col_san1, col_san2 = st.columns(2)
             sancion_orig = col_san1.text_input("Sanción Original")
             sancion_queb = col_san2.text_input("Sanción Quebrantada")
             
-            # Guardamos en session state temporalmente para el generador
             st.session_state.datos_apelacion = {
                 "rit_ap": rit_ap, "ruc_ap": ruc_ap,
+                "hechos_quebrantamiento": hechos_quebrantamiento, # Nuevo campo
                 "resolucion_tribunal": resolucion_tribunal,
                 "argumentos_defensa": argumentos_defensa,
                 "antecedentes_sociales": antecedentes_sociales,
@@ -966,6 +1043,7 @@ def main_app():
                 # Campos Apelación
                 "rit_ap": datos_apelacion.get('rit_ap', ''),
                 "ruc_ap": datos_apelacion.get('ruc_ap', ''),
+                "hechos_quebrantamiento": datos_apelacion.get('hechos_quebrantamiento', ''), # Nuevo
                 "resolucion_tribunal": datos_apelacion.get('resolucion_tribunal', ''),
                 "argumentos_defensa": datos_apelacion.get('argumentos_defensa', ''),
                 "antecedentes_sociales": datos_apelacion.get('antecedentes_sociales', ''),
@@ -1134,19 +1212,25 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: BIBLIOTECA INTELIGENTE (CORREGIDO Y MEJORADO) ===
+    # === TAB 4: BIBLIOTECA INTELIGENTE (RAG MEJORADO + ANALISIS) ===
     with tabs[3]:
-        st.header("📚 Biblioteca Jurídica Inteligente")
+        st.header("📚 Biblioteca Jurídica Inteligente (Investigación RAG)")
         
-        modo_biblio = st.radio("Herramienta", ["🔍 Buscador de Jurisprudencia", "📄 Analizar mi Escrito"], horizontal=True)
+        modo_biblio = st.radio("Herramienta", ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito"], horizontal=True)
         
-        if modo_biblio == "🔍 Buscador de Jurisprudencia":
-            st.info("Busca conceptualmente en la base de datos de fallos y leyes.")
-            query_busqueda = st.text_input("¿Qué tema jurídico necesitas investigar?", placeholder="Ej: Nulidad por entrada y registro sin orden...")
+        if modo_biblio == "🔍 Buscador Jurídico Avanzado":
+            st.info("Buscador semántico potenciado por IA: Filtra, encuentra similitudes y genera respuestas jurídicas.")
             
-            if query_busqueda and st.button("Buscar Fallos"):
-                with st.spinner("Buscando en cerebro legal..."):
+            # Layout de Filtros
+            col_filtros = st.columns(3)
+            filtro_tipo = col_filtros[0].selectbox("Tipo de Documento", ["Todos", "Sentencia Condenatoria", "Sentencia Absolutoria", "Recurso de Nulidad", "Recurso de Amparo", "Recurso de Apelación", "Doctrina/Artículo", "Ley/Normativa"])
+            filtro_tribunal = col_filtros[1].text_input("Tribunal (Opcional)", placeholder="Ej: Suprema, San Miguel")
+            query_busqueda = col_filtros[2].text_input("Tema Jurídico / Consulta", placeholder="Ej: Nulidad por falta de fundamentación")
+            
+            if st.button("🔎 Investigar"):
+                with st.spinner("Consultando bases de datos y generando respuesta..."):
                     try:
+                        # 1. Obtener Embedding de la consulta
                         modelo_dinamico = get_embedding_model()
                         emb_resp = genai.embed_content(
                             model=modelo_dinamico,
@@ -1156,55 +1240,95 @@ def main_app():
                         vector_consulta = emb_resp['embedding']
                         
                         if vector_consulta:
-                            res = supabase.table("documentos_legales").select("*").limit(50).execute()
+                            # 2. Construir Query a Supabase con filtros
+                            query_db = supabase.table("documentos_legales").select("*").limit(100)
+                            
+                            if filtro_tipo != "Todos":
+                                query_db = query_db.eq('metadata->>tipo', filtro_tipo)
+                            # Nota: El filtro de tribunal es texto parcial, mejor hacerlo en Python si no es exacto
+                            
+                            res = query_db.execute()
                             
                             if res.data:
-                                resultados = []
+                                resultados_scores = []
                                 for doc in res.data:
                                     vec_doc = doc.get('embedding')
-                                    # CORRECCIÓN ERROR TIPOS: Parsear vector si viene como string
+                                    # CORRECCIÓN ERROR TIPOS
                                     if isinstance(vec_doc, str):
                                         vec_doc = json.loads(vec_doc)
                                     
+                                    # Filtro tribunal parcial en Python
+                                    meta = doc['metadata']
+                                    if isinstance(meta, str): meta = json.loads(meta)
+                                    
+                                    if filtro_tribunal and filtro_tribunal.lower() not in meta.get('tribunal', '').lower():
+                                        continue
+
                                     if vec_doc:
-                                        # Cálculo similitud coseno
                                         v_a = np.array(vector_consulta)
                                         v_b = np.array(vec_doc)
                                         sim = np.dot(v_a, v_b) / (np.linalg.norm(v_a) * np.linalg.norm(v_b))
-                                        resultados.append((sim, doc))
+                                        resultados_scores.append((sim, doc, meta))
                                 
-                                # Ordenar por similitud
-                                resultados.sort(key=lambda x: x[0], reverse=True)
+                                # Ordenar top 5
+                                resultados_scores.sort(key=lambda x: x[0], reverse=True)
+                                top_resultados = resultados_scores[:5]
                                 
-                                st.subheader("Resultados Relevantes:")
-                                for sim, doc in resultados[:5]: # Top 5
-                                    meta = doc['metadata']
-                                    # Manejo robusto de metadata string vs dict
-                                    if isinstance(meta, str):
-                                        try: meta = json.loads(meta)
-                                        except: meta = {}
+                                if top_resultados:
+                                    # 3. GENERACIÓN DE RESPUESTA JURÍDICA (RAG)
+                                    contexto_rag = ""
+                                    for i, (score, doc, meta) in enumerate(top_resultados):
+                                        contexto_rag += f"FRAGMENTO {i+1} (Rol: {meta.get('rol')}, Tribunal: {meta.get('tribunal')}): {doc['contenido'][:800]}...\n\n"
+                                    
+                                    prompt_rag = f"""
+                                    Eres un abogado investigador senior.
+                                    Basado EXCLUSIVAMENTE en estos fragmentos de jurisprudencia recuperados:
+                                    {contexto_rag}
+                                    
+                                    Redacta una respuesta jurídica directa a la consulta: '{query_busqueda}'.
+                                    Cita obligatoriamente los ROLES y TRIBUNALES de cada fragmento usado para respaldar tu respuesta.
+                                    Si la información no es suficiente, indícalo.
+                                    """
+                                    
+                                    model_resp = get_generative_model_dinamico()
+                                    resp_juridica = model_resp.generate_content(prompt_rag)
+                                    
+                                    st.markdown("<div class='resumen-dinamico'><h4>⚖️ RESPUESTA JURÍDICA INTELIGENTE</h4>" + resp_juridica.text + "</div>", unsafe_allow_html=True)
+                                    
+                                    st.divider()
+                                    st.caption("FUENTES CONSULTADAS:")
+                                    
+                                    # 4. Mostrar Fuentes con Badges
+                                    for score, doc, meta in top_resultados:
+                                        tipo_doc = meta.get('tipo', 'Doc')
+                                        rol_doc = meta.get('rol', 'S/N')
+                                        trib_doc = meta.get('tribunal', '')
                                         
-                                    with st.expander(f"⚖️ {meta.get('tribunal','Tribunal')} - Rol: {meta.get('rol','S/N')} ({int(sim*100)}% Coincidencia)"):
-                                        st.caption(f"Tema: {meta.get('tema','General')} | Tipo: {meta.get('tipo','Documento')}")
-                                        st.markdown(f"**Resultado:** {meta.get('resultado', '')}")
-                                        st.write(doc['contenido'][:500] + "...")
-                                        st.button("Copiar Cita", key=f"btn_{doc['id']}")
+                                        with st.expander(f"{trib_doc} - {rol_doc} (Relevancia: {int(score*100)}%)"):
+                                            st.markdown(f"<span class='badge-tipo'>{tipo_doc}</span> <span class='badge-rol'>{rol_doc}</span>", unsafe_allow_html=True)
+                                            st.markdown(f"**Resultado:** {meta.get('resultado', '-')}")
+                                            st.write(doc['contenido'][:1000] + "...")
+                                            st.button("Copiar Cita", key=f"btn_{doc['id']}")
+                                else:
+                                    st.warning("No se encontraron coincidencias relevantes con esos filtros.")
                             else:
-                                st.warning("No hay documentos en la base de datos aún.")
+                                st.warning("La base de datos no tiene documentos que coincidan con el filtro inicial.")
                         else:
-                            st.error("No se pudo generar el vector de búsqueda.")
+                            st.error("Error generando vector de búsqueda.")
 
                     except Exception as e:
-                        st.error(f"Error en búsqueda: {e}")
+                        st.error(f"Error en motor de búsqueda: {e}")
 
-        else: # Analizar mi Escrito (NUEVA LÓGICA MULTIMODAL)
-            st.info("Sube tu borrador. La IA extraerá conceptos y buscará argumentos de derecho y jurisprudencia sugerida.")
+        else: # Analizar mi Escrito (MEJORADO: SUGERENCIAS DIRECTAS)
+            st.info("Sube tu borrador. La IA detectará debilidades y sugerirá argumentos de derecho sólidos.")
             borrador = st.file_uploader("Sube tu borrador (PDF/Word/Txt)", type=["pdf","docx","txt"])
             
+            # Placeholder conexión externa (Simulación)
+            st.checkbox("Incluir búsqueda en fuentes externas (Simulación - Diario Oficial / PJUD)", value=True, disabled=True)
+            
             if borrador and st.button("Analizar y Buscar Apoyo"):
-                with st.spinner("Analizando borrador jurídicamente..."):
+                with st.spinner("Analizando estrategia jurídica..."):
                     try:
-                        # Reutilizamos la lógica robusta del Analista (Tab 2)
                         model_analista = get_generative_model_dinamico()
                         
                         suffix = f".{borrador.name.split('.')[-1]}"
@@ -1213,19 +1337,16 @@ def main_app():
                             tmp_path = tmp.name
                         
                         f_gemini = genai.upload_file(tmp_path)
-                        while f_gemini.state.name == "PROCESSING":
-                            time.sleep(1)
-                            f_gemini = genai.get_file(f_gemini.name)
+                        while f_gemini.state.name == "PROCESSING": time.sleep(1); f_gemini = genai.get_file(f_gemini.name)
                         
                         prompt_analisis_escrito = """
                         Actúa como un Abogado Senior y Profesor de Derecho Penal. Analiza el borrador adjunto.
-                        TU TAREA:
-                        1. Extraer los conceptos jurídicos clave y tesis planteada.
-                        2. Detectar debilidades argumentativas.
-                        3. SUGERIR ARGUMENTOS DE DERECHO SÓLIDOS para reforzar la postura.
-                        4. Sugerir Jurisprudencia o Doctrina estándar aplicable al caso (Cita Fallos Conocidos si aplica).
+                        NO RESUMAS EL DOCUMENTO. VE DIRECTO AL GRANO.
                         
-                        Formato: Informe Ejecutivo de Asesoría.
+                        TU TAREA ES ENTREGAR 3 COSAS:
+                        1. 🚩 DEBILIDADES DETECTADAS: ¿Qué argumento es débil o falta fundamentación?
+                        2. 🛡️ SUGERENCIAS DE DERECHO: Redacta párrafos jurídicos sólidos que el usuario pueda copiar y pegar para reforzar esas debilidades. Cita artículos y principios.
+                        3. ⚖️ JURISPRUDENCIA SUGERIDA: Menciona qué tipo de fallos debería buscar para apoyar su tesis (ej: "Busca fallos sobre nulidad por falta de emplazamiento").
                         """
                         
                         response = model_analista.generate_content([prompt_analisis_escrito, f_gemini])
@@ -1240,7 +1361,6 @@ def main_app():
         if st.session_state.user_role == "Admin":
             st.header("⚙️ Cerebro Centralizado & Gestión (Admin)")
             
-            # Sub-tabs para organizar mejor la vista de Admin
             tab_ingesta, tab_usuarios = st.tabs(["📂 Ingesta Documental", "👥 Gestión de Usuarios"])
             
             # --- SUB-TAB A: INGESTA ---
@@ -1299,6 +1419,7 @@ def main_app():
                                             Analiza este documento legal escaneado.
                                             1. Extrae el TEXTO COMPLETO (transcripción literal).
                                             2. Genera un JSON con metadata: tribunal, rol, fecha_sentencia, resultado, tema, tipo.
+                                            IMPORTANTE: El 'tipo' debe ser uno de: ["Sentencia Condenatoria", "Sentencia Absolutoria", "Recurso de Nulidad", "Recurso de Amparo", "Recurso de Apelación", "Doctrina/Artículo", "Ley/Normativa"].
                                             FORMATO RESPUESTA:
                                             ---JSON---
                                             {json_aqui}
@@ -1313,7 +1434,7 @@ def main_app():
                                             try:
                                                 metadata_ia = json.loads(json_part)
                                             except:
-                                                metadata_ia = {"rol": "Error OCR", "tribunal": "Desconocido"}
+                                                metadata_ia = {"rol": "Error OCR", "tribunal": "Desconocido", "tipo": "Documento Legal"}
                                             
                                             os.remove(tmp_path)
 
@@ -1362,14 +1483,12 @@ def main_app():
                     st.subheader("2. Inventario Documental")
                     # LÓGICA DE INVENTARIO MEJORADA (SOLICITUD USUARIO)
                     try:
-                        # Traemos solo metadata e ID, ordenado por lo más reciente
                         res = supabase.table("documentos_legales").select("metadata, id").order("id", desc=True).limit(20).execute()
                         
                         if res.data:
                             data_limpia = []
                             for d in res.data:
                                 m = d.get('metadata', {})
-                                # Manejo de errores si metadata es string o dict
                                 if isinstance(m, str): 
                                     try: m = json.loads(m)
                                     except: m = {}
@@ -1397,7 +1516,6 @@ def main_app():
                 with c_lista:
                     st.markdown("##### Usuarios Registrados")
                     try:
-                        # Consultar la tabla 'profiles'
                         users_data = supabase.table("profiles").select("*").execute()
                         if users_data.data:
                             clean_users = []
