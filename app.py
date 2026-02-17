@@ -84,55 +84,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
-    /* LOGIN HERO CSS */
-    .login-container {
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .hero-title {
-        color: #0d47a1;
-        font-weight: 800;
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-        text-align: center;
-    }
-    .hero-subtitle {
-        font-size: 1.2rem;
-        color: #455A64;
-        margin-bottom: 30px;
-        font-style: italic;
-        text-align: center;
-        line-height: 1.6;
-    }
-    .feature-card {
-        background: white;
-        border: 1px solid #E0E0E0;
-        border-radius: 10px;
-        padding: 1.5rem;
-        text-align: center;
-        transition: transform 0.3s;
-        height: 100%;
-    }
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-    }
-    .feature-icon {
-        font-size: 2rem;
-        margin-bottom: 1rem;
-        display: block;
-    }
-    .feature-title {
-        font-weight: 700;
-        color: #1565c0;
-        margin-bottom: 0.5rem;
-        display: block;
-    }
-    
     /* Minuta en Pantalla - Estilo Expediente */
     .minuta-box {
         background-color: #fffde7;
@@ -571,26 +522,98 @@ if "defensor_nombre" not in st.session_state:
 # 7. PANTALLA DE LOGIN (REDISEÑO HERO VERTICAL)
 # =============================================================================
 def login_screen():
-    # Estructura visual Vertical (Hero Layout)
-    st.markdown("<h1 class='hero-title'>SISTEMA JURÍDICO IABL</h1>", unsafe_allow_html=True)
+    # CSS Personalizado para Landing Page
     st.markdown("""
-    <div class='hero-subtitle'>
-    "Sistema de automatización avanzada con herramientas inteligentes pensada en defensores, 
-    porque tu tiempo vale, la salud laboral y la satisfacción del trabajo bien hecho."
-    </div>
+        <style>
+        /* Estilos Generales Landing */
+        .stApp {
+            background-color: #F4F7F6;
+        }
+        h1 {
+            color: #161B2F !important;
+            text-align: center;
+            font-weight: 800;
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+        .hero-subtitle {
+            color: #5B687C;
+            text-align: center;
+            font-size: 1.3rem;
+            font-style: italic;
+            margin-bottom: 2rem;
+            font-weight: 400;
+        }
+        /* Tarjeta de Login */
+        [data-testid="stForm"] {
+            background-color: white;
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border: 1px solid #E0E0E0;
+        }
+        /* Botones */
+        .stButton>button {
+            background-color: #161B2F !important;
+            color: white !important;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            padding: 0.8rem;
+            transition: all 0.3s;
+        }
+        .stButton>button:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        /* Features */
+        .feature-box {
+            text-align: center;
+            padding: 1.5rem;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
+        }
+        .feature-box:hover {
+            transform: translateY(-5px);
+        }
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        .feature-text {
+            color: #161B2F;
+            font-weight: 700;
+        }
+        </style>
     """, unsafe_allow_html=True)
 
-    # Formulario Centrado
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown("<div class='login-container'>", unsafe_allow_html=True)
-        tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
+    # Espacio aire
+    st.write("")
+    st.write("")
 
+    # HERO SECTION
+    st.markdown("<h1>SISTEMA JURÍDICO IABL</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='hero-subtitle'>Automatización inteligente para defensores: tu tiempo, salud y excelencia profesional.</p>", unsafe_allow_html=True)
+
+    # LOGIN SECTION (Centrado)
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    
+    with c2:
+        # Título del formulario específico solicitado
+        st.markdown("<h3 style='text-align: center; color: #161B2F; margin-bottom: 20px;'>ACCESO A SISTEMA JURIDICO AVANZADO</h3>", unsafe_allow_html=True)
+        
+        tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
+        
         with tab_login:
             with st.form("login_form"):
-                email = st.text_input("Correo Electrónico")
-                password = st.text_input("Contraseña", type="password")
-                submitted = st.form_submit_button("INGRESAR", use_container_width=True)
+                email = st.text_input("Correo Electrónico", placeholder="usuario@defensoria.cl")
+                password = st.text_input("Contraseña", type="password", placeholder="••••••••")
+                st.write("") # Espaciador
+                submitted = st.form_submit_button("INGRESAR AL SISTEMA", use_container_width=True)
                 
                 if submitted:
                     try:
@@ -616,7 +639,9 @@ def login_screen():
                 new_email = st.text_input("Tu Correo")
                 new_pass = st.text_input("Crear Contraseña", type="password")
                 new_name = st.text_input("Nombre Completo")
+                st.write("")
                 reg_submit = st.form_submit_button("REGISTRARSE", use_container_width=True)
+                
                 if reg_submit:
                     try:
                         response = supabase.auth.sign_up({
@@ -627,49 +652,30 @@ def login_screen():
                         st.success("✅ Cuenta creada. Revisa tu correo o intenta iniciar sesión.")
                     except Exception as e:
                         st.error(f"Error al registrar: {e}")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.divider()
+    # FEATURES SECTION
+    st.markdown("---")
+    st.write("")
+    
+    f1, f2, f3, f4 = st.columns(4)
+    
+    def feature_card(icon, title, desc):
+        return f"""
+        <div class='feature-box'>
+            <span class='feature-icon'>{icon}</span>
+            <div class='feature-text'>{title}</div>
+            <div style='color: #5B687C; font-size: 0.9rem;'>{desc}</div>
+        </div>
+        """
 
-    # Sección de Características (Cards)
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown("""
-        <div class='feature-card'>
-            <span class='feature-icon'>📝</span>
-            <span class='feature-title'>Generación</span>
-            <p>Redacción de escritos estándar en segundos.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class='feature-card'>
-            <span class='feature-icon'>🕵️</span>
-            <span class='feature-title'>Analista IA</span>
-            <p>Lectura de partes, visión artificial y detección de vicios.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col3:
-        st.markdown("""
-        <div class='feature-card'>
-            <span class='feature-icon'>📚</span>
-            <span class='feature-title'>Biblioteca</span>
-            <p>Buscador semántico de jurisprudencia y doctrina.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-    with col4:
-        st.markdown("""
-        <div class='feature-card'>
-            <span class='feature-icon'>🎙️</span>
-            <span class='feature-title'>Transcriptor</span>
-            <p>Conversión de audio de audiencias a texto forense.</p>
-        </div>
-        """, unsafe_allow_html=True)
+    with f1:
+        st.markdown(feature_card("📝", "Redacción", "Escritos automáticos"), unsafe_allow_html=True)
+    with f2:
+        st.markdown(feature_card("👁️", "Visión IA", "OCR Multimodal"), unsafe_allow_html=True)
+    with f3:
+        st.markdown(feature_card("📚", "Biblioteca", "Jurisprudencia RAG"), unsafe_allow_html=True)
+    with f4:
+        st.markdown(feature_card("🎙️", "Audio", "Transcripción Forense"), unsafe_allow_html=True)
 
 # =============================================================================
 # 8. CÁLCULO PENAL AVANZADO (LÓGICA JURÍDICA MATEMÁTICA)
