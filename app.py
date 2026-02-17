@@ -208,7 +208,20 @@ def analizar_metadata_profunda(texto_completo):
         TEXTO DEL DOCUMENTO (Primeros 15000 caracteres):
         {texto_completo[:15000]}
         """
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Detección automática del modelo generativo (Igual que en Tab 2 y 3)
+        try:
+            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            # Prioridad: Flash -> Pro -> Cualquiera
+            modelo_nombre = next((m for m in modelos_disponibles if 'flash' in m), None)
+            if not modelo_nombre:
+                modelo_nombre = next((m for m in modelos_disponibles if 'pro' in m), modelos_disponibles[0])
+            
+            model = genai.GenerativeModel(modelo_nombre)
+        except:
+            # Fallback de emergencia
+            model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+
         # Forzamos respuesta JSON limpia
         resp = model.generate_content(prompt)
         clean_json = resp.text.replace('```json', '').replace('```', '').strip()
