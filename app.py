@@ -147,16 +147,25 @@ try:
 except Exception as e:
     st.error(f"⚠️ Error configurando API Key: {e}")
 
-def get_gemini_model():
+# === NUEVA FUNCIÓN MAESTRA DE MODELOS DINÁMICOS ===
+def get_generative_model_dinamico():
+    """Busca automáticamente un modelo generativo disponible (Flash > Pro > Cualquiera)."""
     try:
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except:
-        return genai.GenerativeModel('gemini-pro')
+        modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # Prioridad: 1.5 Flash -> 1.5 Pro -> Cualquiera
+        mejor = next((m for m in modelos if 'gemini-1.5-flash' in m), None)
+        if not mejor:
+            mejor = next((m for m in modelos if 'gemini-1.5-pro' in m), modelos[0])
+        # print(f"DEBUG: Usando modelo generativo: {mejor}") # Opcional
+        return genai.GenerativeModel(mejor)
+    except Exception as e:
+        # Fallback de emergencia por si la lista falla
+        return genai.GenerativeModel('models/gemini-1.5-flash-latest')
 
-model_ia = get_gemini_model()
+# Instancia global inicial (para compatibilidad con funciones antiguas del Tab 1)
+model_ia = get_generative_model_dinamico()
 
-# === LÓGICA DE DETECCIÓN AUTOMÁTICA DE MODELO DE EMBEDDING (NUEVO) ===
-# Variable global para guardar el nombre del modelo y no preguntar a cada rato
+# === LÓGICA DE DETECCIÓN AUTOMÁTICA DE MODELO DE EMBEDDING ===
 MODELO_EMBEDDING_ACTUAL = None
 
 def get_embedding_model():
@@ -186,10 +195,9 @@ def get_embedding_model():
         return 'models/text-embedding-004'
         
     except Exception as e:
-        # st.error(f"Advertencia listando modelos: {e}. Usando fallback.")
         return 'models/text-embedding-004'
 
-# === FUNCIÓN PARA METADATA PROFUNDA ===
+# === FUNCIÓN PARA METADATA PROFUNDA (ACTUALIZADA) ===
 def analizar_metadata_profunda(texto_completo):
     """Usa IA para extraer metadata precisa del texto completo del documento."""
     try:
@@ -209,18 +217,8 @@ def analizar_metadata_profunda(texto_completo):
         {texto_completo[:15000]}
         """
         
-        # Detección automática del modelo generativo (Igual que en Tab 2 y 3)
-        try:
-            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            # Prioridad: Flash -> Pro -> Cualquiera
-            modelo_nombre = next((m for m in modelos_disponibles if 'flash' in m), None)
-            if not modelo_nombre:
-                modelo_nombre = next((m for m in modelos_disponibles if 'pro' in m), modelos_disponibles[0])
-            
-            model = genai.GenerativeModel(modelo_nombre)
-        except:
-            # Fallback de emergencia
-            model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+        # CAMBIO 2: USO DE MODELO DINÁMICO
+        model = get_generative_model_dinamico()
 
         # Forzamos respuesta JSON limpia
         resp = model.generate_content(prompt)
@@ -913,6 +911,8 @@ def main_app():
             status_box = st.empty()
             with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
                 try:
+                    # CAMBIO 3: Instancia local del modelo analista
+                    model_analista = get_generative_model_dinamico()
                     docs_para_gemini = []
                     
                     for archivo in archivos_evidencia:
@@ -972,7 +972,8 @@ def main_app():
                     prompt_final = [system_prompt, f"Contexto adicional: {contexto_usuario}"]
                     prompt_final.extend(docs_para_gemini)
 
-                    response = model_ia.generate_content(prompt_final)
+                    # Usamos la instancia local
+                    response = model_analista.generate_content(prompt_final)
                     
                     status_box.success("✅ Análisis Completado")
                     
@@ -1120,7 +1121,7 @@ def main_app():
             if borrador and st.button("Analizar y Buscar Apoyo"):
                 st.success("Funcionalidad en desarrollo: Conectará tu borrador con la búsqueda vectorial mostrada arriba.")
 
-    # === TAB 5: ADMIN & CARGA (GESTIÓN USUARIOS + INGESTA DINÁMICA) ===
+    # === TAB 5: ADMIN & CARGA (GESTIÓN USUARIOS + INGESTA DINÁMICA + OCR) ===
     with tabs[4]:
         if st.session_state.user_role == "Admin":
             st.header("⚙️ Cerebro Centralizado & Gestión (Admin)")
@@ -1152,7 +1153,7 @@ def main_app():
                             progress_bar_general = st.progress(0)
                             total_files = len(archivos_pdf)
                             
-                            # Obtener modelo dinámico UNA vez al inicio del lote
+                            # Obtener modelo dinámico UNA vez al inicio del lote para embeddings
                             modelo_dinamico = get_embedding_model()
                             st.write(f"Usando modelo de embedding: {modelo_dinamico}")
                             
@@ -1165,14 +1166,54 @@ def main_app():
                                         for page in reader.pages:
                                             texto_completo += page.extract_text() or ""
                                         
-                                        if not texto_completo:
-                                            status.update(label=f"❌ Archivo vacío o ilegible: {archivo_pdf.name}", state="error")
-                                            continue
+                                        # CAMBIO 4: OCR HÍBRIDO (Si hay poco texto, usamos Vision)
+                                        if len(texto_completo) < 50:
+                                            status.write("⚠️ Texto insuficiente, activando OCR con IA Vision...")
+                                            st.toast(f"Activando OCR para {archivo_pdf.name}")
+                                            
+                                            # 1. Guardar temporal y subir a Gemini
+                                            suffix = f".{archivo_pdf.name.split('.')[-1]}"
+                                            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                                                tmp.write(archivo_pdf.getvalue())
+                                                tmp_path = tmp.name
+                                            
+                                            f_gemini = genai.upload_file(tmp_path)
+                                            while f_gemini.state.name == "PROCESSING": 
+                                                time.sleep(1)
+                                                f_gemini = genai.get_file(f_gemini.name)
+                                            
+                                            # 2. Pedir Metadata y Texto a la vez
+                                            model_ocr = get_generative_model_dinamico()
+                                            prompt_ocr = """
+                                            Analiza este documento legal escaneado.
+                                            1. Extrae el TEXTO COMPLETO (transcripción literal).
+                                            2. Genera un JSON con metadata: tribunal, rol, fecha_sentencia, resultado, tema, tipo.
+                                            FORMATO RESPUESTA:
+                                            ---JSON---
+                                            {json_aqui}
+                                            ---TEXTO---
+                                            (texto_aqui)
+                                            """
+                                            resp_ocr = model_ocr.generate_content([prompt_ocr, f_gemini])
+                                            
+                                            # 3. Parsear respuesta (separar JSON de Texto) para poder guardar
+                                            parts = resp_ocr.text.split("---TEXTO---")
+                                            json_part = parts[0].replace("---JSON---", "").replace("```json", "").replace("```", "").strip()
+                                            texto_completo = parts[1].strip() if len(parts) > 1 else ""
+                                            try:
+                                                metadata_ia = json.loads(json_part)
+                                            except:
+                                                metadata_ia = {"rol": "Error OCR", "tribunal": "Desconocido"}
+                                            
+                                            os.remove(tmp_path) # Limpieza
 
-                                        status.write("Analizando metadata jurídica con IA...")
-                                        metadata_ia = analizar_metadata_profunda(texto_completo)
-                                        metadata_ia["origen"] = archivo_pdf.name
+                                        else:
+                                            # Flujo normal para PDF digital
+                                            status.write("Analizando metadata jurídica con IA...")
+                                            metadata_ia = analizar_metadata_profunda(texto_completo)
                                         
+                                        # Agregar origen
+                                        metadata_ia["origen"] = archivo_pdf.name
                                         status.write(f"Metadata detectada: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
 
                                         status.write("Fragmentando texto...")
