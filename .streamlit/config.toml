@@ -1,0 +1,29 @@
+[theme]
+# OBLIGATORIO: Fuerza el modo claro para evitar errores de texto invisible
+base = "light"
+
+# TU PALETA DE COLORES PERSONALIZADA
+
+# Color Principal (Botones, deslizadores, acentos)
+# Usamos tu "Azul Pizarra" (#5B687C) para un look serio pero moderno.
+primaryColor = "#5B687C"
+
+# Fondo Principal
+# Blanco puro para máxima limpieza y legibilidad profesional.
+backgroundColor = "#FFFFFF"
+
+# Fondo Secundario (Barra lateral, cajas de input, mensajes de sistema)
+# Usamos un gris muy suave (casi blanco) para dar profundidad sin ensuciar.
+secondaryBackgroundColor = "#F4F7F6"
+
+# Color del Texto
+# Usamos tu "Azul Marino Profundo" (#161B2F). Es mejor que el negro puro, da elegancia.
+textColor = "#161B2F"
+
+# Fuente
+# Sans serif es la más moderna y limpia para lectura en pantalla.
+font = "sans serif"
+
+[server]
+runOnSave = true
+headless = true
