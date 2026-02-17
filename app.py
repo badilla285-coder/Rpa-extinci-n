@@ -155,21 +155,41 @@ def get_gemini_model():
 
 model_ia = get_gemini_model()
 
-# === FUNCIÓN DE SEGURIDAD PARA EMBEDDINGS ===
-def obtener_embedding_seguro(texto):
-    """Intenta usar el modelo nuevo, si falla usa el legacy"""
-    try:
-        # Intento 1: Modelo moderno
-        return genai.embed_content(model="models/text-embedding-004", content=texto, task_type="retrieval_document")['embedding']
-    except Exception:
-        try:
-            # Intento 2: Modelo clásico (Legacy) - Este casi nunca falla
-            return genai.embed_content(model="models/embedding-001", content=texto, task_type="retrieval_document")['embedding']
-        except Exception as e:
-            st.error(f"Error crítico en embedding: {e}")
-            return None
+# === LÓGICA DE DETECCIÓN AUTOMÁTICA DE MODELO DE EMBEDDING (NUEVO) ===
+# Variable global para guardar el nombre del modelo y no preguntar a cada rato
+MODELO_EMBEDDING_ACTUAL = None
 
-# === FUNCIÓN PARA METADATA PROFUNDA (NUEVA) ===
+def get_embedding_model():
+    """Busca automáticamente un modelo de embedding disponible en la cuenta."""
+    global MODELO_EMBEDDING_ACTUAL
+    if MODELO_EMBEDDING_ACTUAL:
+        return MODELO_EMBEDDING_ACTUAL
+
+    try:
+        # Listar todos los modelos y buscar uno que soporte 'embedContent'
+        modelos = list(genai.list_models())
+        
+        # 1. Preferencia por text-embedding-004
+        for m in modelos:
+            if 'embedContent' in m.supported_generation_methods:
+                if 'text-embedding-004' in m.name:
+                    MODELO_EMBEDDING_ACTUAL = m.name
+                    return m.name
+        
+        # 2. Si no, cualquiera que soporte embeddings
+        for m in modelos:
+            if 'embedContent' in m.supported_generation_methods:
+                MODELO_EMBEDDING_ACTUAL = m.name
+                return m.name
+        
+        # 3. Fallback hardcoded si la lista falla
+        return 'models/text-embedding-004'
+        
+    except Exception as e:
+        # st.error(f"Advertencia listando modelos: {e}. Usando fallback.")
+        return 'models/text-embedding-004'
+
+# === FUNCIÓN PARA METADATA PROFUNDA ===
 def analizar_metadata_profunda(texto_completo):
     """Usa IA para extraer metadata precisa del texto completo del documento."""
     try:
@@ -855,16 +875,16 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-    # === TAB 2: ANALISTA MULTIMODAL ===
+    # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
         st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
 
+        # MERGED: Se unió Teoría del Caso con Salidas Alternativas
         objetivo_analisis = st.radio(
             "¿Qué buscas en estos documentos?",
             ["📄 Control de Detención (Busca ilegalidades)", 
-             "⚖️ Teoría del Caso (Estrategia de defensa)",
-             "🔍 Salidas Alternativas & Ejecución (Beneficios)"],
+             "⚖️ Estrategia Integral (Teoría del Caso, Salidas & Prognosis)"],
             horizontal=True
         )
 
@@ -898,7 +918,7 @@ def main_app():
                         docs_para_gemini.append(f_gemini)
                         os.remove(tmp_path)
 
-                    status_box.info("🧠 Generando estrategia jurídica...")
+                    status_box.info("🧠 Generando estrategia jurídica integral...")
 
                     if "Control de Detención" in objetivo_analisis:
                         system_prompt = """
@@ -913,27 +933,27 @@ def main_app():
                         
                         SALIDA: Lista de ilegalidades con probabilidad de éxito y argumentos.
                         """
-                    elif "Teoría del Caso" in objetivo_analisis:
-                        system_prompt = """
-                        Eres un Estratega de Defensa Penal. Analiza toda la evidencia.
-                        TU MISIÓN: Construir una Teoría del Caso.
-                        
-                        ANALIZA:
-                        1. Debilidades de la prueba de cargo.
-                        2. Coartadas posibles derivadas de la evidencia visual/documental.
-                        3. Prognosis de Pena: Calcula pena probable.
-                        4. ¿Absolución o Negociación?
-                        """
                     else:
+                        # PROMPT COMBINADO (Teoría del Caso + Salidas Alternativas)
                         system_prompt = """
-                        Eres experto en Ejecución Penal y Salidas Alternativas.
-                        TU MISIÓN: Verificar viabilidad de términos anticipados.
+                        Eres un Estratega de Defensa Penal y Experto en Ejecución. Analiza toda la evidencia adjunta.
+                        TU MISIÓN: Construir una Estrategia de Defensa Integral.
                         
-                        ANALIZA:
-                        1. Suspensión Condicional (Art. 237 CPP): Pena probable < 3 años.
-                        2. Acuerdo Reparatorio (Art. 241 CPP): Bienes disponibles.
-                        3. Procedimiento Abreviado: Requisitos y conveniencia.
-                        4. Ley 18.216: Penas sustitutivas aplicables.
+                        DEBES ANALIZAR Y RESPONDER ESTOS 3 BLOQUES:
+                        
+                        BLOQUE 1: TEORÍA DEL CASO Y PROGNOSIS
+                        - Debilidades de la prueba de cargo (Fiscalía).
+                        - Coartadas posibles derivadas de la evidencia visual/documental.
+                        - Prognosis de Pena: Calcula pena probable según el delito y atenuantes visibles.
+                        - ¿Recomiendas ir a Juicio o Negociar?
+                        
+                        BLOQUE 2: SALIDAS ALTERNATIVAS (TÉRMINOS ANTICIPADOS)
+                        - Suspensión Condicional (Art. 237 CPP): ¿Es viable? (Pena probable < 3 años).
+                        - Acuerdo Reparatorio (Art. 241 CPP): ¿Hay bienes jurídicos disponibles?
+                        - Procedimiento Abreviado: Requisitos y conveniencia estratégica.
+                        
+                        BLOQUE 3: CUMPLIMIENTO (LEY 18.216)
+                        - Si es condenado, ¿a qué pena sustitutiva podría optar? (Remisión, Libertad Vigilada, etc).
                         """
 
                     prompt_final = [system_prompt, f"Contexto adicional: {contexto_usuario}"]
@@ -945,7 +965,7 @@ def main_app():
                     
                     st.markdown("---")
                     st.markdown(response.text)
-                    st.download_button("📥 Descargar Informe", response.text, "Analisis_Legal.txt")
+                    st.download_button("📥 Descargar Informe", response.text, "Analisis_Integral_Legal.txt")
 
                 except Exception as e:
                     st.error(f"Error en el análisis multimodal: {e}")
@@ -1025,7 +1045,7 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: BIBLIOTECA INTELIGENTE (ACTUALIZADO: BÚSQUEDA SEGURA) ===
+    # === TAB 4: BIBLIOTECA INTELIGENTE (ACTUALIZADO: BÚSQUEDA DINÁMICA) ===
     with tabs[3]:
         st.header("📚 Biblioteca Jurídica Inteligente")
         
@@ -1038,8 +1058,14 @@ def main_app():
             if query_busqueda and st.button("Buscar Fallos"):
                 with st.spinner("Buscando en cerebro legal..."):
                     try:
-                        # USO DE FUNCIÓN SEGURA
-                        vector_consulta = obtener_embedding_seguro(query_busqueda)
+                        # USO DE DETECCIÓN AUTOMÁTICA DE MODELO
+                        modelo_dinamico = get_embedding_model()
+                        emb_resp = genai.embed_content(
+                            model=modelo_dinamico,
+                            content=query_busqueda,
+                            task_type="retrieval_query"
+                        )
+                        vector_consulta = emb_resp['embedding']
                         
                         if vector_consulta:
                             # 2. Traer documentos (Simulación de búsqueda vectorial si no hay RPC configurada)
@@ -1081,114 +1107,190 @@ def main_app():
             if borrador and st.button("Analizar y Buscar Apoyo"):
                 st.success("Funcionalidad en desarrollo: Conectará tu borrador con la búsqueda vectorial mostrada arriba.")
 
-    # === TAB 5: ADMIN & CARGA (REESCRITO: INGESTA INTELIGENTE & ROBUSTA) ===
+    # === TAB 5: ADMIN & CARGA (GESTIÓN USUARIOS + INGESTA DINÁMICA) ===
     with tabs[4]:
         if st.session_state.user_role == "Admin":
-            st.header("⚙️ Cerebro Centralizado (Admin)")
-            st.info("Alimenta el sistema con Leyes y Jurisprudencia. Proceso inteligente con IA.")
+            st.header("⚙️ Cerebro Centralizado & Gestión (Admin)")
+            
+            # Sub-tabs para organizar mejor la vista de Admin
+            tab_ingesta, tab_usuarios = st.tabs(["📂 Ingesta Documental", "👥 Gestión de Usuarios"])
+            
+            # --- SUB-TAB A: INGESTA ---
+            with tab_ingesta:
+                st.info("Alimenta el sistema con Leyes y Jurisprudencia. Proceso inteligente con IA.")
+                col_subida, col_consulta = st.columns([2, 1])
 
-            col_subida, col_consulta = st.columns([2, 1])
+                with col_subida:
+                    st.subheader("1. Ingesta Inteligente de Documentos")
+                    
+                    archivos_pdf = st.file_uploader(
+                        "Subir Archivos (PDF) - Máx 10", 
+                        type="pdf", 
+                        accept_multiple_files=True,
+                        key="pdf_rag_multi"
+                    )
 
-            with col_subida:
-                st.subheader("1. Ingesta Inteligente de Documentos")
-                
-                # Uploader Múltiple
-                archivos_pdf = st.file_uploader(
-                    "Subir Archivos (PDF) - Máx 10", 
-                    type="pdf", 
-                    accept_multiple_files=True,
-                    key="pdf_rag_multi"
-                )
+                    if archivos_pdf:
+                        if len(archivos_pdf) > 10:
+                            st.error("⚠️ Por estabilidad y seguridad, sube máximo 10 archivos a la vez.")
+                            st.stop()
 
-                # Validación de seguridad
-                if archivos_pdf:
-                    if len(archivos_pdf) > 10:
-                        st.error("⚠️ Por estabilidad y seguridad, sube máximo 10 archivos a la vez.")
-                        st.stop()
-
-                    if st.button("💾 Procesar y Guardar en Memoria"):
-                        progress_bar_general = st.progress(0)
-                        total_files = len(archivos_pdf)
-                        
-                        for idx_file, archivo_pdf in enumerate(archivos_pdf):
-                            with st.status(f"Procesando {archivo_pdf.name}...", expanded=False) as status:
-                                try:
-                                    # 1. Leer PDF COMPLETO (Full Context)
-                                    status.write("Leyendo documento completo...")
-                                    reader = PyPDF2.PdfReader(archivo_pdf)
-                                    texto_completo = ""
-                                    for page in reader.pages:
-                                        texto_completo += page.extract_text() or ""
-                                    
-                                    if not texto_completo:
-                                        status.update(label=f"❌ Archivo vacío o ilegible: {archivo_pdf.name}", state="error")
-                                        continue
-
-                                    # 2. Análisis de Metadata Profunda con IA
-                                    status.write("Analizando metadata jurídica con IA...")
-                                    metadata_ia = analizar_metadata_profunda(texto_completo)
-                                    
-                                    # Agregamos origen al metadata
-                                    metadata_ia["origen"] = archivo_pdf.name
-                                    
-                                    status.write(f"Metadata detectada: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
-
-                                    # 3. Fragmentar texto (Chunking)
-                                    status.write("Fragmentando texto...")
-                                    chunk_size = 1500 # Un poco más grande para mejor contexto
-                                    chunks = [texto_completo[i:i+chunk_size] for i in range(0, len(texto_completo), chunk_size)]
-                                    
-                                    # 4. Vectorizar y Guardar
-                                    status.write("Generando vectores y guardando...")
-                                    for i, chunk in enumerate(chunks):
-                                        # USO DE FUNCIÓN SEGURA
-                                        vector = obtener_embedding_seguro(chunk)
-
-                                        if vector:
-                                            data_insert = {
-                                                "contenido": chunk,
-                                                "metadata": metadata_ia, # Metadata enriquecida por IA
-                                                "embedding": vector
-                                            }
-                                            supabase.table("documentos_legales").insert(data_insert).execute()
-                                    
-                                    status.update(label=f"✅ {archivo_pdf.name} Procesado Exitosamente", state="complete")
-                                    st.toast(f"✅ Guardado: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
-
-                                except Exception as e:
-                                    status.update(label=f"❌ Error en {archivo_pdf.name}: {str(e)}", state="error")
-                                    st.error(f"Detalle error: {e}")
+                        if st.button("💾 Procesar y Guardar en Memoria"):
+                            progress_bar_general = st.progress(0)
+                            total_files = len(archivos_pdf)
                             
-                            # Actualizar barra de progreso general
-                            progress_bar_general.progress((idx_file + 1) / total_files)
+                            # Obtener modelo dinámico UNA vez al inicio del lote
+                            modelo_dinamico = get_embedding_model()
+                            st.write(f"Usando modelo de embedding: {modelo_dinamico}")
+                            
+                            for idx_file, archivo_pdf in enumerate(archivos_pdf):
+                                with st.status(f"Procesando {archivo_pdf.name}...", expanded=False) as status:
+                                    try:
+                                        status.write("Leyendo documento completo...")
+                                        reader = PyPDF2.PdfReader(archivo_pdf)
+                                        texto_completo = ""
+                                        for page in reader.pages:
+                                            texto_completo += page.extract_text() or ""
+                                        
+                                        if not texto_completo:
+                                            status.update(label=f"❌ Archivo vacío o ilegible: {archivo_pdf.name}", state="error")
+                                            continue
 
-                        st.success("🏁 Proceso de ingesta finalizado.")
-                        time.sleep(2)
-                        st.rerun()
+                                        status.write("Analizando metadata jurídica con IA...")
+                                        metadata_ia = analizar_metadata_profunda(texto_completo)
+                                        metadata_ia["origen"] = archivo_pdf.name
+                                        
+                                        status.write(f"Metadata detectada: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
 
-            with col_consulta:
-                st.subheader("2. Inventario Documental")
-                try:
-                    res = supabase.table("documentos_legales").select("metadata, id").limit(15).execute()
-                    if res.data:
-                        tabla_fallos = []
-                        seen_rols = set()
-                        for d in res.data:
-                            meta = d['metadata']
-                            rol = meta.get('rol', 'S/N')
-                            if rol not in seen_rols:
-                                tabla_fallos.append({
-                                    "Tipo": meta.get('tipo', 'N/A'),
-                                    "Rol": rol,
-                                    "Tribunal": meta.get('tribunal', ''),
-                                    "Resultado": meta.get('resultado', '-')
+                                        status.write("Fragmentando texto...")
+                                        chunk_size = 1500 
+                                        chunks = [texto_completo[i:i+chunk_size] for i in range(0, len(texto_completo), chunk_size)]
+                                        
+                                        status.write("Generando vectores y guardando...")
+                                        for i, chunk in enumerate(chunks):
+                                            # USO DE MODELO DINÁMICO
+                                            emb_resp = genai.embed_content(
+                                                model=modelo_dinamico,
+                                                content=chunk,
+                                                task_type="retrieval_document"
+                                            )
+                                            vector = emb_resp['embedding']
+
+                                            if vector:
+                                                data_insert = {
+                                                    "contenido": chunk,
+                                                    "metadata": metadata_ia,
+                                                    "embedding": vector
+                                                }
+                                                supabase.table("documentos_legales").insert(data_insert).execute()
+                                        
+                                        status.update(label=f"✅ {archivo_pdf.name} Procesado Exitosamente", state="complete")
+                                        st.toast(f"✅ Guardado: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
+
+                                    except Exception as e:
+                                        status.update(label=f"❌ Error en {archivo_pdf.name}: {str(e)}", state="error")
+                                        st.error(f"Detalle error: {e}")
+                                
+                                progress_bar_general.progress((idx_file + 1) / total_files)
+
+                            st.success("🏁 Proceso de ingesta finalizado.")
+                            time.sleep(2)
+                            st.rerun()
+
+                with col_consulta:
+                    st.subheader("2. Inventario Documental")
+                    try:
+                        res = supabase.table("documentos_legales").select("metadata, id").limit(15).execute()
+                        if res.data:
+                            tabla_fallos = []
+                            seen_rols = set()
+                            for d in res.data:
+                                meta = d['metadata']
+                                rol = meta.get('rol', 'S/N')
+                                if rol not in seen_rols:
+                                    tabla_fallos.append({
+                                        "Tipo": meta.get('tipo', 'N/A'),
+                                        "Rol": rol,
+                                        "Tribunal": meta.get('tribunal', ''),
+                                        "Resultado": meta.get('resultado', '-')
+                                    })
+                                    seen_rols.add(rol)
+                            st.dataframe(tabla_fallos, use_container_width=True)
+                        else:
+                            st.info("Base de datos vacía.")
+                    except Exception as e:
+                        st.error(f"Error conexión: {e}")
+            
+            # --- SUB-TAB B: USUARIOS ---
+            with tab_usuarios:
+                st.subheader("👥 Gestión de Usuarios del Sistema")
+                
+                c_lista, c_crear = st.columns([2, 1])
+                
+                with c_lista:
+                    st.markdown("##### Usuarios Registrados")
+                    try:
+                        # Consultar la tabla 'profiles'
+                        users_data = supabase.table("profiles").select("*").execute()
+                        if users_data.data:
+                            # Prepara datos para mostrar
+                            clean_users = []
+                            for u in users_data.data:
+                                clean_users.append({
+                                    "Nombre": u.get('nombre', 'Sin Nombre'),
+                                    "Rol": u.get('rol', 'User'),
+                                    "Fecha Registro": u.get('created_at', '')[:10]
                                 })
-                                seen_rols.add(rol)
-                        st.dataframe(tabla_fallos, use_container_width=True)
-                    else:
-                        st.info("Base de datos vacía.")
-                except Exception as e:
-                    st.error(f"Error conexión: {e}")
+                            st.dataframe(clean_users, use_container_width=True)
+                        else:
+                            st.info("No se encontraron perfiles de usuario.")
+                    except Exception as e:
+                        st.error(f"Error al cargar usuarios: {e}")
+
+                with c_crear:
+                    st.markdown("##### Registrar Nuevo Funcionario")
+                    with st.form("admin_create_user"):
+                        new_u_email = st.text_input("Correo Institucional")
+                        new_u_pass = st.text_input("Contraseña Temporal", type="password")
+                        new_u_name = st.text_input("Nombre Funcionario")
+                        new_u_role = st.selectbox("Rol Asignado", ["User", "Admin"])
+                        
+                        btn_crear = st.form_submit_button("Crear Usuario")
+                        
+                        if btn_crear:
+                            try:
+                                # Nota: sign_up loguea al usuario automáticamente en el cliente.
+                                # Como esto es una herramienta admin simple, advertimos o usamos una función administrativa si estuviera disponible.
+                                # Aquí usamos el sign_up estándar pero guardamos el rol en profiles vía trigger o manual.
+                                
+                                # 1. Crear Auth User
+                                res = supabase.auth.sign_up({
+                                    "email": new_u_email,
+                                    "password": new_u_pass,
+                                    "options": {
+                                        "data": {
+                                            "nombre": new_u_name,
+                                            # Pasamos el rol en metadata para que el Trigger lo capture si está configurado,
+                                            # o para referencia futura.
+                                            "rol_solicitado": new_u_role 
+                                        }
+                                    }
+                                })
+                                
+                                if res.user:
+                                    # 2. Forzar actualización del Rol en la tabla profiles (si el trigger no lo hizo con el rol correcto)
+                                    # El trigger suele poner "User" por defecto. El admin lo promueve aquí.
+                                    time.sleep(1) # Esperar a que el trigger cree el profile
+                                    supabase.table("profiles").update({"rol": new_u_role}).eq("id", res.user.id).execute()
+                                    
+                                    st.success(f"Usuario {new_u_name} creado correctamente.")
+                                    st.warning("⚠️ Nota: Es posible que debas volver a iniciar sesión si el sistema te cambió de cuenta automáticamente.")
+                                else:
+                                    st.error("No se pudo crear el usuario. Verifique el correo.")
+                                    
+                            except Exception as e:
+                                st.error(f"Error creando usuario: {e}")
+
         else:
             st.warning("🔒 Acceso restringido a Administradores.")
             st.info("Debes iniciar sesión con una cuenta autorizada.")
