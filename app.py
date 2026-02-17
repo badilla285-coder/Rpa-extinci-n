@@ -13,6 +13,7 @@ import time
 import random
 import tempfile
 import os
+import numpy as np # Importante para los vectores
 
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
@@ -24,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Profesional: Alto Contraste, Elegancia y Animaciones
+# CSS Profesional: Alto Contraste, Elegancia y Animaciones + LOGIN HERO
 st.markdown("""
     <style>
     /* Animación de entrada */
@@ -83,40 +84,53 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
-    /* Login Box - Diseño Mejorado */
-    .login-wrapper {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding-top: 50px;
-        animation: fadeIn 0.8s ease-out;
-    }
+    /* LOGIN HERO CSS */
     .login-container {
-        background: #ffffff;
-        padding: 50px;
-        border-radius: 16px;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        background: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         text-align: center;
-        border-top: 6px solid #0d47a1;
-        width: 100%;
-        max-width: 450px;
+        margin-bottom: 2rem;
     }
-    .login-title {
+    .hero-title {
         color: #0d47a1;
-        font-size: 1.8rem;
         font-weight: 800;
-        margin-bottom: 10px;
-        letter-spacing: -0.5px;
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        text-align: center;
     }
-    .login-subtitle {
-        font-size: 1rem;
-        color: #546e7a;
+    .hero-subtitle {
+        font-size: 1.2rem;
+        color: #455A64;
+        margin-bottom: 30px;
         font-style: italic;
-        margin-top: 25px;
-        font-weight: 400;
-        line-height: 1.5;
-        border-top: 1px solid #eceff1;
-        padding-top: 20px;
+        text-align: center;
+        line-height: 1.6;
+    }
+    .feature-card {
+        background: white;
+        border: 1px solid #E0E0E0;
+        border-radius: 10px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s;
+        height: 100%;
+    }
+    .feature-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    }
+    .feature-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+    .feature-title {
+        font-weight: 700;
+        color: #1565c0;
+        margin-bottom: 0.5rem;
+        display: block;
     }
     
     /* Minuta en Pantalla - Estilo Expediente */
@@ -130,6 +144,15 @@ st.markdown("""
         font-family: 'Courier New', Courier, monospace; 
         box-shadow: 0 4px 10px rgba(0,0,0,0.05);
         border-left: 6px solid #fbc02d;
+    }
+    
+    /* Estilo para el resumen dinámico */
+    .resumen-dinamico {
+        background-color: #e3f2fd;
+        border-left: 5px solid #1976d2;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 15px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -267,8 +290,8 @@ TIPOS_RECURSOS = [
     "Extinción Art. 25 ter",
     "Prescripción de la Pena",
     "Amparo Constitucional",
-    "Apelación por Quebrantamiento",
-    "Minuta Control de Detención"
+    "Apelación por Quebrantamiento"
+    # "Minuta Control de Detención" -> ELIMINADO DEL MENÚ
 ]
 
 # Escala de Penas (Grados) para cálculo matemático
@@ -373,7 +396,8 @@ class GeneradorWord:
                 "POR TANTO", "OTROSÍ", "EN LO PRINCIPAL", 
                 "SOLICITA", "INTERPONE", "ACCIÓN CONSTITUCIONAL",
                 "HECHOS:", "DERECHO:", "AGRAVIO:", "PETICIONES CONCRETAS:", 
-                "FUNDAMENTOS DE DERECHO:", "ANTECEDENTES DE HECHO:"
+                "FUNDAMENTOS DE DERECHO:", "ANTECEDENTES DE HECHO:",
+                "RESOLUCIÓN IMPUGNADA:", "ARGUMENTOS DE LA DEFENSA:", "ANTECEDENTES SOCIALES:", "SANCIÓN:", "SANCIÓN QUEBRANTADA:"
             ]
             
             patron_regex = "|".join(keywords) + f"|{re.escape(self.defensor)}|{re.escape(self.imputado)}"
@@ -428,6 +452,12 @@ class GeneradorWord:
             causas_txts = [f"RUC {c['ruc']}, RIT {c['rit']}" for c in lista_causas if c['ruc']]
             if causas_txts:
                 causas_str = ", en las causas " + "; ".join(causas_txts) + ","
+        elif tipo == "Apelación por Quebrantamiento":
+            # Para Apelación usamos los campos específicos si están llenos
+            rit_ap = datos.get('rit_ap', '')
+            ruc_ap = datos.get('ruc_ap', '')
+            if rit_ap:
+                causas_str = f", en causa RIT {rit_ap}, RUC {ruc_ap},"
         else:
             lista_ej = datos.get('ejecucion', [])
             causas_txts = [f"RUC {c.get('ruc','')}, RIT {c.get('rit','')}" for c in lista_ej if c.get('rit')]
@@ -495,32 +525,26 @@ class GeneradorWord:
         elif tipo == "Apelación por Quebrantamiento":
             self.add_parrafo("Que encontrándome dentro del plazo legal, vengo en interponer recurso de apelación en contra de la resolución que ordenó el quebrantamiento definitivo de la sanción de mi representado, solicitando se revoque y se mantenga la sanción original en el medio libre o se decrete un quebrantamiento parcial.")
             self.add_parrafo("I. HECHOS:", negrita=True)
-            if datos.get('argumento_extra'):
-                self.add_parrafo(datos['argumento_extra'])
-            else:
-                self.add_parrafo("El tribunal decretó el quebrantamiento total sin considerar las circunstancias personales del adolescente y la posibilidad de reinserción.")
+            self.add_parrafo("RESOLUCIÓN IMPUGNADA:", negrita=True)
+            self.add_parrafo(datos.get('resolucion_tribunal', 'No especificada'))
+            self.add_parrafo("ARGUMENTOS DE LA DEFENSA:", negrita=True)
+            self.add_parrafo(datos.get('argumentos_defensa', 'No especificados'))
+            
+            if datos.get('antecedentes_sociales'):
+                self.add_parrafo("ANTECEDENTES SOCIALES:", negrita=True)
+                self.add_parrafo(datos.get('antecedentes_sociales'))
+            
+            self.add_parrafo("SANCIÓN ORIGINAL:", negrita=True)
+            self.add_parrafo(datos.get('sancion_orig', ''))
+            self.add_parrafo("SANCIÓN QUEBRANTADA:", negrita=True)
+            self.add_parrafo(datos.get('sancion_quebrantada', ''))
+
             self.add_parrafo("II. EL DERECHO Y AGRAVIO:", negrita=True)
             self.add_parrafo("La resolución causa agravio pues desestima que la privación de libertad es una medida de último recurso (ultima ratio) según el artículo 40 n°2 de la Convención de Derechos del Niño.")
             self.add_parrafo("Principio de Progresividad: El artículo 52 de la Ley 20.084 establece una gradualidad en las sanciones por incumplimiento. Saltar directamente al quebrantamiento definitivo vulnera este principio, interrumpiendo procesos de reinserción escolar o laboral.")
             self.add_parrafo("Reinserción Social: El fin de la pena adolescente es la prevención especial positiva. El encierro total frustra este objetivo.")
             self.add_parrafo("POR TANTO,", sangria=False)
             self.add_parrafo("SOLICITO A US. tener por interpuesto recurso de apelación, concederlo y elevar los antecedentes a la Iltma. Corte de Apelaciones para que revoque la resolución impugnada.", sangria=False)
-
-        elif tipo == "Minuta Control de Detención":
-            self.add_parrafo("I. HECHOS (RELATO FISCALÍA):", negrita=True)
-            self.add_parrafo(f"Fecha: {datos.get('fecha_det','')}. Lugar: {datos.get('lugar_det','')}.")
-            self.add_parrafo(datos.get('hechos_relato', 'No especificado'))
-            self.add_parrafo("II. VERSIÓN DEL IMPUTADO / DEFENSA:", negrita=True)
-            self.add_parrafo(datos.get('version_imputado', 'El imputado hizo uso de su derecho a guardar silencio, sin embargo la defensa sostiene...'))
-            self.add_parrafo("III. INCIDENCIAS Y ARGUMENTOS DE DERECHO:", negrita=True)
-            for arg in datos.get('argumentos_det', []):
-                self.add_parrafo(f"- {arg}")
-            if datos.get('argumento_extra'):
-                self.add_parrafo(f"- {datos['argumento_extra']}")
-            self.add_parrafo("IV. PETICIONES CONCRETAS AL TRIBUNAL:", negrita=True)
-            self.add_parrafo("1. Que se declare ilegal la detención por vulneración de garantías constitucionales (Art 85, 83 CPP).")
-            self.add_parrafo("2. Que se rechace la prisión preventiva/internación provisoria por falta de necesidad de cautela o proporcionalidad.")
-            self.add_parrafo("3. Subsidiarimente, medidas del Art. 155 CPP.")
 
         buffer = io.BytesIO()
         self.doc.save(buffer)
@@ -544,17 +568,22 @@ if "defensor_nombre" not in st.session_state:
     st.session_state.defensor_nombre = ""
 
 # =============================================================================
-# 7. PANTALLA DE LOGIN
+# 7. PANTALLA DE LOGIN (REDISEÑO HERO VERTICAL)
 # =============================================================================
 def login_screen():
+    # Estructura visual Vertical (Hero Layout)
+    st.markdown("<h1 class='hero-title'>SISTEMA JURÍDICO IABL</h1>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class='hero-subtitle'>
+    "Sistema de automatización avanzada con herramientas inteligentes pensada en defensores, 
+    porque tu tiempo vale, la salud laboral y la satisfacción del trabajo bien hecho."
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Formulario Centrado
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        st.markdown("""
-        <div class='login-wrapper'>
-            <div class='login-container'>
-                <div class='login-title'>🏛️ ACCESO AL SISTEMA IABL</div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown("<div class='login-container'>", unsafe_allow_html=True)
         tab_login, tab_registro = st.tabs(["🔐 Iniciar Sesión", "📝 Crear Cuenta"])
 
         with tab_login:
@@ -586,9 +615,8 @@ def login_screen():
             with st.form("register_form"):
                 new_email = st.text_input("Tu Correo")
                 new_pass = st.text_input("Crear Contraseña", type="password")
-                new_name = st.text_input("Nombre Completo (Para los escritos)")
+                new_name = st.text_input("Nombre Completo")
                 reg_submit = st.form_submit_button("REGISTRARSE", use_container_width=True)
-                
                 if reg_submit:
                     try:
                         response = supabase.auth.sign_up({
@@ -599,8 +627,49 @@ def login_screen():
                         st.success("✅ Cuenta creada. Revisa tu correo o intenta iniciar sesión.")
                     except Exception as e:
                         st.error(f"Error al registrar: {e}")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        st.markdown("</div></div>", unsafe_allow_html=True)
+    st.divider()
+
+    # Sección de Características (Cards)
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown("""
+        <div class='feature-card'>
+            <span class='feature-icon'>📝</span>
+            <span class='feature-title'>Generación</span>
+            <p>Redacción de escritos estándar en segundos.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div class='feature-card'>
+            <span class='feature-icon'>🕵️</span>
+            <span class='feature-title'>Analista IA</span>
+            <p>Lectura de partes, visión artificial y detección de vicios.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col3:
+        st.markdown("""
+        <div class='feature-card'>
+            <span class='feature-icon'>📚</span>
+            <span class='feature-title'>Biblioteca</span>
+            <p>Buscador semántico de jurisprudencia y doctrina.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col4:
+        st.markdown("""
+        <div class='feature-card'>
+            <span class='feature-icon'>🎙️</span>
+            <span class='feature-title'>Transcriptor</span>
+            <p>Conversión de audio de audiencias a texto forense.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # =============================================================================
 # 8. CÁLCULO PENAL AVANZADO (LÓGICA JURÍDICA MATEMÁTICA)
@@ -739,8 +808,24 @@ def main_app():
     with tabs[0]:
         st.markdown("### 1. Individualización")
         col_def, col_imp = st.columns(2)
-        st.session_state.defensor_nombre = col_def.text_input("Defensor/a", value=st.session_state.defensor_nombre)
-        st.session_state.imputado = col_imp.text_input("Imputado/a", value=st.session_state.imputado)
+        
+        # Implementación de "Borrar Campo" (X pequeña) usando columnas
+        def clear_field(key):
+            st.session_state[key] = ""
+
+        # Defensor
+        c_d1, c_d2 = c_def_cols = col_def.columns([0.9, 0.1])
+        st.session_state.defensor_nombre = c_d1.text_input("Defensor/a", value=st.session_state.defensor_nombre, key="input_defensor")
+        if c_d2.button("✖️", key="btn_clear_def", help="Borrar Defensor"):
+            st.session_state.defensor_nombre = ""
+            st.rerun()
+
+        # Imputado
+        c_i1, c_i2 = col_imp.columns([0.9, 0.1])
+        st.session_state.imputado = c_i1.text_input("Imputado/a", value=st.session_state.imputado, key="input_imputado")
+        if c_i2.button("✖️", key="btn_clear_imp", help="Borrar Imputado"):
+            st.session_state.imputado = ""
+            st.rerun()
         
         st.markdown("**Causas Individualizadas:**")
         for i, c in enumerate(st.session_state.lista_individualizacion):
@@ -822,49 +907,43 @@ def main_app():
                     st.session_state.adulto.append({})
                     st.rerun()
 
-        elif tipo_recurso in ["Amparo Constitucional", "Apelación por Quebrantamiento"]:
+        elif tipo_recurso == "Apelación por Quebrantamiento":
+            st.subheader("2. Detalle del Quebrantamiento")
+            
+            # Campos Específicos para Apelación
+            col_ap1, col_ap2 = st.columns(2)
+            rit_ap = col_ap1.text_input("RIT Causa Apelación")
+            ruc_ap = col_ap2.text_input("RUC Causa Apelación")
+            
+            resolucion_tribunal = st.text_area("Resolución del Tribunal (Que se impugna)", height=100)
+            argumentos_defensa = st.text_area("Argumentos Defensa (Transcripción)", height=100)
+            
+            antecedentes_sociales = st.text_area("Antecedentes Sociales (Opcional)", height=80, placeholder="Educacional, Laboral, Familiar...")
+            
+            col_san1, col_san2 = st.columns(2)
+            sancion_orig = col_san1.text_input("Sanción Original")
+            sancion_queb = col_san2.text_input("Sanción Quebrantada")
+            
+            # Guardamos en session state temporalmente para el generador
+            st.session_state.datos_apelacion = {
+                "rit_ap": rit_ap, "ruc_ap": ruc_ap,
+                "resolucion_tribunal": resolucion_tribunal,
+                "argumentos_defensa": argumentos_defensa,
+                "antecedentes_sociales": antecedentes_sociales,
+                "sancion_orig": sancion_orig,
+                "sancion_quebrantada": sancion_queb
+            }
+
+        elif tipo_recurso == "Amparo Constitucional":
             st.subheader("2. Fundamentos Específicos")
             argumento_extra = st.text_area("Antecedentes de Hecho Adicionales (Opcional)", height=150)
             st.session_state.argumento_extra = argumento_extra
 
-        elif tipo_recurso == "Minuta Control de Detención":
-            st.subheader("2. Detalles de la Detención")
-            with st.form("form_minuta"):
-                c1, c2 = st.columns(2)
-                f_det = c1.text_input("Fecha/Hora Detención")
-                l_det = c2.text_input("Lugar Detención")
-                hechos_relato = st.text_area("Relato de Hechos (Fiscalía)", height=100)
-                version_imp = st.text_area("Versión del Imputado", height=100)
-                args_sel = st.multiselect("Argumentos Defensa", [
-                    "Ilegalidad: Falta de indicios (Art 85 CPP)",
-                    "Ilegalidad: Ausencia de Flagrancia (Art 83 CPP)",
-                    "Ilegalidad: Lectura tardía de derechos",
-                    "RPA: Falta de notificación a padres",
-                    "RPA: Esposamiento Injustificado"
-                ])
-                gen_minuta = st.form_submit_button("Generar Vista Previa")
-                if gen_minuta:
-                    st.session_state.datos_minuta = {
-                        "fecha": f_det, "lugar": l_det, "args": args_sel,
-                        "hechos_relato": hechos_relato, "version_imputado": version_imp
-                    }
-            if "datos_minuta" in st.session_state:
-                dm = st.session_state.datos_minuta
-                st.markdown(f"""
-                <div class='minuta-box'>
-                <strong>MINUTA DE AUDIENCIA</strong><br>
-                <strong>Hechos:</strong> {dm['fecha']} en {dm['lugar']}<br>
-                <strong>Relato:</strong> {dm['hechos_relato']}<br>
-                <strong>Versión Imputado:</strong> {dm['version_imputado']}<br>
-                <hr>
-                <strong>Alegaciones:</strong><br>
-                { '<br>'.join(['- '+a for a in dm['args']]) }
-                </div>
-                """, unsafe_allow_html=True)
-
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button(f"🚀 GENERAR ESCRITO: {tipo_recurso}", type="primary", use_container_width=True):
             dm_safe = st.session_state.get('datos_minuta', {})
+            datos_apelacion = st.session_state.get('datos_apelacion', {})
+            
             datos_finales = {
                 "tribunal_ej": st.session_state.tribunal_sel,
                 "prescripcion_list": st.session_state.prescripcion_list,
@@ -877,7 +956,15 @@ def main_app():
                 "lugar_det": dm_safe.get('lugar', ''),
                 "argumentos_det": dm_safe.get('args', []),
                 "hechos_relato": dm_safe.get('hechos_relato', ''),
-                "version_imputado": dm_safe.get('version_imputado', '')
+                "version_imputado": dm_safe.get('version_imputado', ''),
+                # Campos Apelación
+                "rit_ap": datos_apelacion.get('rit_ap', ''),
+                "ruc_ap": datos_apelacion.get('ruc_ap', ''),
+                "resolucion_tribunal": datos_apelacion.get('resolucion_tribunal', ''),
+                "argumentos_defensa": datos_apelacion.get('argumentos_defensa', ''),
+                "antecedentes_sociales": datos_apelacion.get('antecedentes_sociales', ''),
+                "sancion_orig": datos_apelacion.get('sancion_orig', ''),
+                "sancion_quebrantada": datos_apelacion.get('sancion_quebrantada', '')
             }
             gen = GeneradorWord(st.session_state.defensor_nombre, st.session_state.imputado)
             buffer = gen.generar(tipo_recurso, datos_finales)
@@ -886,12 +973,11 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-    # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS) ===
+    # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
         st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
 
-        # MERGED: Se unió Teoría del Caso con Salidas Alternativas
         objetivo_analisis = st.radio(
             "¿Qué buscas en estos documentos?",
             ["📄 Control de Detención (Busca ilegalidades)", 
@@ -911,13 +997,11 @@ def main_app():
             status_box = st.empty()
             with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
                 try:
-                    # CAMBIO 3: Instancia local del modelo analista
                     model_analista = get_generative_model_dinamico()
                     docs_para_gemini = []
                     
                     for archivo in archivos_evidencia:
                         status_box.info(f"Subiendo a Gemini Vision: {archivo.name}...")
-                        
                         suffix = f".{archivo.name.split('.')[-1]}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                             tmp.write(archivo.getvalue())
@@ -933,53 +1017,57 @@ def main_app():
 
                     status_box.info("🧠 Generando estrategia jurídica integral...")
 
+                    prompt_system = """
+                    Eres un Estratega de Defensa Penal.
+                    IMPORTANTE: Tu respuesta es para un abogado. NO incluyas código python, ni json raw, ni expliques que eres una IA.
+                    Solo entrega el informe jurídico profesional.
+                    """
+
                     if "Control de Detención" in objetivo_analisis:
-                        system_prompt = """
-                        Eres un Abogado Penalista experto en Garantías. Analiza la evidencia visual y textual adjunta (Partes, Actas).
+                        prompt_especifico = """
                         TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
-                        
-                        BUSCA ESPECÍFICAMENTE:
-                        1. Indicios del Art. 85 CPP: ¿Son objetivos o subjetivos?
-                        2. Flagrancia (Art. 130 CPP): Tiempos, visualización.
-                        3. Lectura de Derechos: ¿Consta en actas? ¿Hora?
-                        4. Uso de la fuerza / Constatación de lesiones.
-                        
-                        SALIDA: Lista de ilegalidades con probabilidad de éxito y argumentos.
+                        Genera también un RECUADRO DE RESUMEN al final con:
+                        - Ilegalidad detectada: (Sí/No)
+                        - Probabilidad de éxito: (Alta/Media/Baja)
+                        - Argumento clave.
                         """
                     else:
-                        # PROMPT COMBINADO (Teoría del Caso + Salidas Alternativas)
-                        system_prompt = """
-                        Eres un Estratega de Defensa Penal y Experto en Ejecución. Analiza toda la evidencia adjunta.
+                        prompt_especifico = """
                         TU MISIÓN: Construir una Estrategia de Defensa Integral.
                         
-                        DEBES ANALIZAR Y RESPONDER ESTOS 3 BLOQUES:
+                        ESTRUCTURA OBLIGATORIA DEL INFORME:
+                        1. ANÁLISIS DE LA PRUEBA (Debilidades fiscalía).
+                        2. TEORÍA DEL CASO (Nuestra versión).
                         
-                        BLOQUE 1: TEORÍA DEL CASO Y PROGNOSIS
-                        - Debilidades de la prueba de cargo (Fiscalía).
-                        - Coartadas posibles derivadas de la evidencia visual/documental.
-                        - Prognosis de Pena: Calcula pena probable según el delito y atenuantes visibles.
-                        - ¿Recomiendas ir a Juicio o Negociar?
-                        
-                        BLOQUE 2: SALIDAS ALTERNATIVAS (TÉRMINOS ANTICIPADOS)
-                        - Suspensión Condicional (Art. 237 CPP): ¿Es viable? (Pena probable < 3 años).
-                        - Acuerdo Reparatorio (Art. 241 CPP): ¿Hay bienes jurídicos disponibles?
-                        - Procedimiento Abreviado: Requisitos y conveniencia estratégica.
-                        
-                        BLOQUE 3: CUMPLIMIENTO (LEY 18.216)
-                        - Si es condenado, ¿a qué pena sustitutiva podría optar? (Remisión, Libertad Vigilada, etc).
+                        AL FINAL, GENERA UN BLOQUE LLAMADO "RESUMEN ESTRATÉGICO" CON:
+                        - Pena Probable: (Ej: 541 días)
+                        - Pena Sustitutiva: (Ej: Remisión Condicional)
+                        - Atenuantes: (Lista)
+                        - Agravantes: (Lista)
+                        - Salida Alternativa: (Viabilidad SCP o AR)
+                        - Recomendación: (Juicio o Abreviado)
                         """
 
-                    prompt_final = [system_prompt, f"Contexto adicional: {contexto_usuario}"]
+                    prompt_final = [prompt_system + prompt_especifico, f"Contexto adicional: {contexto_usuario}"]
                     prompt_final.extend(docs_para_gemini)
 
-                    # Usamos la instancia local
                     response = model_analista.generate_content(prompt_final)
                     
                     status_box.success("✅ Análisis Completado")
                     
-                    st.markdown("---")
-                    st.markdown(response.text)
-                    st.download_button("📥 Descargar Informe", response.text, "Analisis_Integral_Legal.txt")
+                    texto_resultado = response.text
+                    
+                    # Extracción simple del Resumen para mostrar en recuadro bonito
+                    if "RESUMEN ESTRATÉGICO" in texto_resultado:
+                        partes = texto_resultado.split("RESUMEN ESTRATÉGICO")
+                        resumen_texto = partes[-1]
+                        contenido_principal = partes[0]
+                        st.markdown(f"<div class='resumen-dinamico'><h4>📊 RESUMEN ESTRATÉGICO</h4>{resumen_texto}</div>", unsafe_allow_html=True)
+                        st.markdown(contenido_principal)
+                    else:
+                        st.markdown(texto_resultado)
+                    
+                    st.download_button("📥 Descargar Informe", texto_resultado, "Analisis_Integral_Legal.txt")
 
                 except Exception as e:
                     st.error(f"Error en el análisis multimodal: {e}")
@@ -994,27 +1082,10 @@ def main_app():
         if uploaded_audio is not None:
             if st.button("🚀 PROCESAR AUDIO (AUTO-DETECTAR MODELO)"):
                 status_container = st.empty()
-                
                 with st.spinner("🔄 Auto-detectando modelo y procesando..."):
                     try:
-                        modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        
-                        modelo_a_usar = None
-                        for m in modelos_disponibles:
-                            if 'gemini-1.5-flash' in m:
-                                modelo_a_usar = m
-                                break
-                        
-                        if not modelo_a_usar:
-                            for m in modelos_disponibles:
-                                if 'gemini-1.5-pro' in m:
-                                    modelo_a_usar = m
-                                    break
-                        
-                        if not modelo_a_usar:
-                            modelo_a_usar = next((m for m in modelos_disponibles if '1.5' in m), 'models/gemini-1.5-flash')
-
-                        status_container.info(f"🤖 Modelo detectado y seleccionado: {modelo_a_usar}")
+                        model_transcriptor = get_generative_model_dinamico() # Usamos el getter dinámico
+                        status_container.info(f"🤖 Procesando audio...")
 
                         suffix = f".{uploaded_audio.name.split('.')[-1]}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
@@ -1033,8 +1104,6 @@ def main_app():
 
                         status_container.info("📝 Redactando recurso...")
                         
-                        model_transcriptor = genai.GenerativeModel(modelo_a_usar)
-
                         prompt_transcripcion = """
                         Actúa como un Estenógrafo Judicial y Abogado Penalista.
                         TAREA 1: Transcribe LITERALMENTE el audio (Juez, Fiscal, Defensa).
@@ -1046,7 +1115,7 @@ def main_app():
                         texto_generado = response.text
 
                         status_container.success("✅ ¡Listo!")
-                        st.subheader(f"📄 Resultado (Usando {modelo_a_usar})")
+                        st.subheader(f"📄 Resultado")
                         st.markdown(texto_generado)
 
                         st.download_button("📥 Descargar", texto_generado, "Recurso_Audiencia.txt")
@@ -1059,7 +1128,7 @@ def main_app():
         else:
             st.warning("Por favor, carga un archivo de audio para comenzar.")
 
-    # === TAB 4: BIBLIOTECA INTELIGENTE (ACTUALIZADO: BÚSQUEDA DINÁMICA) ===
+    # === TAB 4: BIBLIOTECA INTELIGENTE (CORREGIDO Y MEJORADO) ===
     with tabs[3]:
         st.header("📚 Biblioteca Jurídica Inteligente")
         
@@ -1072,7 +1141,6 @@ def main_app():
             if query_busqueda and st.button("Buscar Fallos"):
                 with st.spinner("Buscando en cerebro legal..."):
                     try:
-                        # USO DE DETECCIÓN AUTOMÁTICA DE MODELO
                         modelo_dinamico = get_embedding_model()
                         emb_resp = genai.embed_content(
                             model=modelo_dinamico,
@@ -1082,17 +1150,21 @@ def main_app():
                         vector_consulta = emb_resp['embedding']
                         
                         if vector_consulta:
-                            # 2. Traer documentos (Simulación de búsqueda vectorial si no hay RPC configurada)
                             res = supabase.table("documentos_legales").select("*").limit(50).execute()
                             
                             if res.data:
-                                import numpy as np
                                 resultados = []
                                 for doc in res.data:
                                     vec_doc = doc.get('embedding')
+                                    # CORRECCIÓN ERROR TIPOS: Parsear vector si viene como string
+                                    if isinstance(vec_doc, str):
+                                        vec_doc = json.loads(vec_doc)
+                                    
                                     if vec_doc:
-                                        # Cálculo similitud coseno simple
-                                        sim = np.dot(vector_consulta, vec_doc) / (np.linalg.norm(vector_consulta) * np.linalg.norm(vec_doc))
+                                        # Cálculo similitud coseno
+                                        v_a = np.array(vector_consulta)
+                                        v_b = np.array(vec_doc)
+                                        sim = np.dot(v_a, v_b) / (np.linalg.norm(v_a) * np.linalg.norm(v_b))
                                         resultados.append((sim, doc))
                                 
                                 # Ordenar por similitud
@@ -1101,8 +1173,13 @@ def main_app():
                                 st.subheader("Resultados Relevantes:")
                                 for sim, doc in resultados[:5]: # Top 5
                                     meta = doc['metadata']
+                                    # Manejo robusto de metadata string vs dict
+                                    if isinstance(meta, str):
+                                        try: meta = json.loads(meta)
+                                        except: meta = {}
+                                        
                                     with st.expander(f"⚖️ {meta.get('tribunal','Tribunal')} - Rol: {meta.get('rol','S/N')} ({int(sim*100)}% Coincidencia)"):
-                                        st.caption(f"Tema: {meta.get('tema','General')} | Tipo: {meta.get('tipo_doc','Documento')}")
+                                        st.caption(f"Tema: {meta.get('tema','General')} | Tipo: {meta.get('tipo','Documento')}")
                                         st.markdown(f"**Resultado:** {meta.get('resultado', '')}")
                                         st.write(doc['contenido'][:500] + "...")
                                         st.button("Copiar Cita", key=f"btn_{doc['id']}")
@@ -1114,12 +1191,43 @@ def main_app():
                     except Exception as e:
                         st.error(f"Error en búsqueda: {e}")
 
-        else: # Analizar mi Escrito
-            st.info("Sube tu borrador. La IA extraerá conceptos y buscará jurisprudencia de apoyo.")
+        else: # Analizar mi Escrito (NUEVA LÓGICA MULTIMODAL)
+            st.info("Sube tu borrador. La IA extraerá conceptos y buscará argumentos de derecho y jurisprudencia sugerida.")
             borrador = st.file_uploader("Sube tu borrador (PDF/Word/Txt)", type=["pdf","docx","txt"])
             
             if borrador and st.button("Analizar y Buscar Apoyo"):
-                st.success("Funcionalidad en desarrollo: Conectará tu borrador con la búsqueda vectorial mostrada arriba.")
+                with st.spinner("Analizando borrador jurídicamente..."):
+                    try:
+                        # Reutilizamos la lógica robusta del Analista (Tab 2)
+                        model_analista = get_generative_model_dinamico()
+                        
+                        suffix = f".{borrador.name.split('.')[-1]}"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                            tmp.write(borrador.getvalue())
+                            tmp_path = tmp.name
+                        
+                        f_gemini = genai.upload_file(tmp_path)
+                        while f_gemini.state.name == "PROCESSING":
+                            time.sleep(1)
+                            f_gemini = genai.get_file(f_gemini.name)
+                        
+                        prompt_analisis_escrito = """
+                        Actúa como un Abogado Senior y Profesor de Derecho Penal. Analiza el borrador adjunto.
+                        TU TAREA:
+                        1. Extraer los conceptos jurídicos clave y tesis planteada.
+                        2. Detectar debilidades argumentativas.
+                        3. SUGERIR ARGUMENTOS DE DERECHO SÓLIDOS para reforzar la postura.
+                        4. Sugerir Jurisprudencia o Doctrina estándar aplicable al caso (Cita Fallos Conocidos si aplica).
+                        
+                        Formato: Informe Ejecutivo de Asesoría.
+                        """
+                        
+                        response = model_analista.generate_content([prompt_analisis_escrito, f_gemini])
+                        st.markdown(response.text)
+                        
+                        os.remove(tmp_path)
+                    except Exception as e:
+                        st.error(f"Error analizando escrito: {e}")
 
     # === TAB 5: ADMIN & CARGA (GESTIÓN USUARIOS + INGESTA DINÁMICA + OCR) ===
     with tabs[4]:
@@ -1132,10 +1240,10 @@ def main_app():
             # --- SUB-TAB A: INGESTA ---
             with tab_ingesta:
                 st.info("Alimenta el sistema con Leyes y Jurisprudencia. Proceso inteligente con IA.")
-                col_subida, col_consulta = st.columns([2, 1])
+                col_subida, col_consulta = st.columns([1, 1])
 
                 with col_subida:
-                    st.subheader("1. Ingesta Inteligente de Documentos")
+                    st.subheader("1. Ingesta Inteligente")
                     
                     archivos_pdf = st.file_uploader(
                         "Subir Archivos (PDF) - Máx 10", 
@@ -1153,7 +1261,6 @@ def main_app():
                             progress_bar_general = st.progress(0)
                             total_files = len(archivos_pdf)
                             
-                            # Obtener modelo dinámico UNA vez al inicio del lote para embeddings
                             modelo_dinamico = get_embedding_model()
                             st.write(f"Usando modelo de embedding: {modelo_dinamico}")
                             
@@ -1166,12 +1273,11 @@ def main_app():
                                         for page in reader.pages:
                                             texto_completo += page.extract_text() or ""
                                         
-                                        # CAMBIO 4: OCR HÍBRIDO (Si hay poco texto, usamos Vision)
+                                        # CAMBIO: OCR HÍBRIDO (Si hay poco texto, usamos Vision)
                                         if len(texto_completo) < 50:
                                             status.write("⚠️ Texto insuficiente, activando OCR con IA Vision...")
                                             st.toast(f"Activando OCR para {archivo_pdf.name}")
                                             
-                                            # 1. Guardar temporal y subir a Gemini
                                             suffix = f".{archivo_pdf.name.split('.')[-1]}"
                                             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                                                 tmp.write(archivo_pdf.getvalue())
@@ -1182,7 +1288,6 @@ def main_app():
                                                 time.sleep(1)
                                                 f_gemini = genai.get_file(f_gemini.name)
                                             
-                                            # 2. Pedir Metadata y Texto a la vez
                                             model_ocr = get_generative_model_dinamico()
                                             prompt_ocr = """
                                             Analiza este documento legal escaneado.
@@ -1196,7 +1301,6 @@ def main_app():
                                             """
                                             resp_ocr = model_ocr.generate_content([prompt_ocr, f_gemini])
                                             
-                                            # 3. Parsear respuesta (separar JSON de Texto) para poder guardar
                                             parts = resp_ocr.text.split("---TEXTO---")
                                             json_part = parts[0].replace("---JSON---", "").replace("```json", "").replace("```", "").strip()
                                             texto_completo = parts[1].strip() if len(parts) > 1 else ""
@@ -1205,14 +1309,12 @@ def main_app():
                                             except:
                                                 metadata_ia = {"rol": "Error OCR", "tribunal": "Desconocido"}
                                             
-                                            os.remove(tmp_path) # Limpieza
+                                            os.remove(tmp_path)
 
                                         else:
-                                            # Flujo normal para PDF digital
                                             status.write("Analizando metadata jurídica con IA...")
                                             metadata_ia = analizar_metadata_profunda(texto_completo)
                                         
-                                        # Agregar origen
                                         metadata_ia["origen"] = archivo_pdf.name
                                         status.write(f"Metadata detectada: {metadata_ia.get('rol')} - {metadata_ia.get('tribunal')}")
 
@@ -1222,7 +1324,6 @@ def main_app():
                                         
                                         status.write("Generando vectores y guardando...")
                                         for i, chunk in enumerate(chunks):
-                                            # USO DE MODELO DINÁMICO
                                             emb_resp = genai.embed_content(
                                                 model=modelo_dinamico,
                                                 content=chunk,
@@ -1253,27 +1354,33 @@ def main_app():
 
                 with col_consulta:
                     st.subheader("2. Inventario Documental")
+                    # LÓGICA DE INVENTARIO MEJORADA (SOLICITUD USUARIO)
                     try:
-                        res = supabase.table("documentos_legales").select("metadata, id").limit(15).execute()
+                        # Traemos solo metadata e ID, ordenado por lo más reciente
+                        res = supabase.table("documentos_legales").select("metadata, id").order("id", desc=True).limit(20).execute()
+                        
                         if res.data:
-                            tabla_fallos = []
-                            seen_rols = set()
+                            data_limpia = []
                             for d in res.data:
-                                meta = d['metadata']
-                                rol = meta.get('rol', 'S/N')
-                                if rol not in seen_rols:
-                                    tabla_fallos.append({
-                                        "Tipo": meta.get('tipo', 'N/A'),
-                                        "Rol": rol,
-                                        "Tribunal": meta.get('tribunal', ''),
-                                        "Resultado": meta.get('resultado', '-')
-                                    })
-                                    seen_rols.add(rol)
-                            st.dataframe(tabla_fallos, use_container_width=True)
+                                m = d.get('metadata', {})
+                                # Manejo de errores si metadata es string o dict
+                                if isinstance(m, str): 
+                                    try: m = json.loads(m)
+                                    except: m = {}
+                                
+                                data_limpia.append({
+                                    "ID": d['id'],
+                                    "Tribunal": m.get('tribunal', 'N/A'),
+                                    "Rol": m.get('rol', 'S/N'),
+                                    "Tipo": m.get('tipo', 'Doc')
+                                })
+                            
+                            st.dataframe(data_limpia, use_container_width=True, hide_index=True)
                         else:
-                            st.info("Base de datos vacía.")
+                            st.info("La base de datos está vacía.")
+                            
                     except Exception as e:
-                        st.error(f"Error conexión: {e}")
+                        st.error(f"Error cargando inventario: {e}")
             
             # --- SUB-TAB B: USUARIOS ---
             with tab_usuarios:
@@ -1287,7 +1394,6 @@ def main_app():
                         # Consultar la tabla 'profiles'
                         users_data = supabase.table("profiles").select("*").execute()
                         if users_data.data:
-                            # Prepara datos para mostrar
                             clean_users = []
                             for u in users_data.data:
                                 clean_users.append({
@@ -1313,30 +1419,20 @@ def main_app():
                         
                         if btn_crear:
                             try:
-                                # Nota: sign_up loguea al usuario automáticamente en el cliente.
-                                # Como esto es una herramienta admin simple, advertimos o usamos una función administrativa si estuviera disponible.
-                                # Aquí usamos el sign_up estándar pero guardamos el rol en profiles vía trigger o manual.
-                                
-                                # 1. Crear Auth User
                                 res = supabase.auth.sign_up({
                                     "email": new_u_email,
                                     "password": new_u_pass,
                                     "options": {
                                         "data": {
                                             "nombre": new_u_name,
-                                            # Pasamos el rol en metadata para que el Trigger lo capture si está configurado,
-                                            # o para referencia futura.
                                             "rol_solicitado": new_u_role 
                                         }
                                     }
                                 })
                                 
                                 if res.user:
-                                    # 2. Forzar actualización del Rol en la tabla profiles (si el trigger no lo hizo con el rol correcto)
-                                    # El trigger suele poner "User" por defecto. El admin lo promueve aquí.
-                                    time.sleep(1) # Esperar a que el trigger cree el profile
+                                    time.sleep(1)
                                     supabase.table("profiles").update({"rol": new_u_role}).eq("id", res.user.id).execute()
-                                    
                                     st.success(f"Usuario {new_u_name} creado correctamente.")
                                     st.warning("⚠️ Nota: Es posible que debas volver a iniciar sesión si el sistema te cambió de cuenta automáticamente.")
                                 else:
