@@ -350,10 +350,26 @@ class State(rx.State):
                     text = ocr_resp.text
                     os.remove(tmp_path)
 
-                # Metadata & Indexing Logic (Simplificada para Reflex Demo)
-                # ... (Lógica de chunking e inserción igual a versiones previas)
+                meta_prompt = f"Extrae JSON metadata (rol, tribunal, tipo, tema) de: {text[:5000]}"
+                model = get_generative_model_dinamico()
+                meta_resp = model.generate_content(meta_prompt)
+                try:
+                    clean_json = meta_resp.text.replace('```json', '').replace('```', '').strip()
+                    metadata = json.loads(clean_json)
+                except:
+                    metadata = {"rol": "Desconocido", "tipo": "Documento"}
+
+                chunk_size = 1500
+                chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+                for chunk in chunks:
+                    emb_resp = genai.embed_content(model="models/text-embedding-004", content=chunk)
+                    sb.table("documentos_legales").insert({
+                        "contenido": chunk,
+                        "metadata": metadata,
+                        "embedding": emb_resp['embedding']
+                    }).execute()
                 docs_processed += 1
-            self.admin_upload_status = f"✅ Procesados: {docs_processed}"
+            self.admin_upload_status = f"✅ Ingesta completa: {docs_processed} docs."
         except Exception as e:
             self.admin_upload_status = f"❌ Error: {str(e)}"
         self.is_ingesting = False
@@ -419,10 +435,10 @@ def app_sidebar():
         display=["none", "none", "flex"]
     )
 
-def login_screen():
-    return rx.flex(
+def login_page():
+    return rx.center(
         rx.vstack(
-            rx.heading("SISTEMA JURÍDICO IABL", size="8", color=COLORS["navy"], font_weight="900", letter_spacing="-1px"),
+            rx.heading("SISTEMA JURÍDICO IABL", size="8", color=COLORS["navy"], text_align="center"),
             rx.text(
                 "Automatización inteligente para defensores: tu tiempo vale.",
                 color=COLORS["slate"],
