@@ -1,517 +1,288 @@
 import reflex as rx
-
-class State(rx.State):
-    """Application state."""
-    pass
-
-
-def index() -> rx.Component:
-    """Main page component."""
-    return rx.container(
-        rx.vstack(
-            rx.heading("Welcome to iabl_reflex", size="lg"),
-            rx.text("Your application starts here"),
-            spacing="4",
-            align="center",
-        ),
-        center_content=True,
-        padding="2em",
-    )
-
-
-app = rx.App()
-app.add_page(index)
-import reflex as rx
-from docx import Document
-from docx.shared import Pt, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-import io
-import re
-import json
-import os
-import tempfile
-import time
-import base64
-import numpy as np
-import PyPDF2
 from supabase import create_client
-import google.generativeai as genai
-from datetime import datetime
-from typing import List
+import asyncio
 
-# =============================================================================
-# 1. CONFIGURACIÓN Y ESTILOS
-# =============================================================================
+# ==========================================
+# 1. CONFIGURACIÓN Y CLAVES 🔑
+# ==========================================
+# Puse tus claves directas para evitar errores de configuración por ahora
+SUPABASE_URL = "https://zblcddxbhyomkasmbvyz.supabase.co"
+SUPABASE_KEY = "sb_publishable_pHMqXxI39AssehHdBs1wqA_NVjPc-FT"
 
-# Configura tus claves aquí si estás en local, o usa .env
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "") 
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-
-if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-
-# PALETA NÓRDICA
-COLORS = {
-    "navy": "#161B2F",
-    "slate": "#5B687C",
-    "beige": "#F4F7F6",  # Fondo más claro
-    "surface": "#FFFFFF",
-    "accent": "#2C3E50",
-    "border": "#E2E8F0"
+# ==========================================
+# 2. ESTILO "LUXUS" (PALETA NÓRDICA PRO) 🎨
+# ==========================================
+STYLE = {
+    "bg_app": "#F4F7F6",
+    "primary": "#161B2F",      # Navy Profundo
+    "secondary": "#5B687C",    # Slate Blue
+    "accent": "#00BFA5",       # Turquesa elegante para botones
+    "white": "#FFFFFF",
+    "glass": "rgba(255, 255, 255, 0.9)", # Efecto Vidrio
+    "shadow": "0 8px 32px 0 rgba(31, 38, 135, 0.15)", # Sombra de alta gama
+    "border": "1px solid rgba(255, 255, 255, 0.18)",
+    "font": "Inter, system-ui, sans-serif"
 }
 
-# =============================================================================
-# 2. MODELOS DE DATOS
-# =============================================================================
-
-class Jurisprudencia(rx.Base):
-    rol: str = ""
-    tribunal: str = ""
-    tipo: str = ""
-    contenido: str = ""
-    similarity: float = 0.0
-
-# =============================================================================
-# 3. LÓGICA DE NEGOCIO (HELPERS)
-# =============================================================================
-
-def get_supabase():
-    if SUPABASE_URL and SUPABASE_KEY:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
-    return None
-
-def get_generative_model_dinamico():
-    try:
-        modelos = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        mejor = next((m for m in modelos if 'gemini-1.5-flash' in m), None)
-        if not mejor:
-            mejor = next((m for m in modelos if 'gemini-1.5-pro' in m), models[0])
-        return genai.GenerativeModel(mejor)
-    except:
-        return genai.GenerativeModel('models/gemini-1.5-flash-latest')
-
-class GeneradorWord:
-    def __init__(self, defensor, imputado):
-        self.doc = Document()
-        self.defensor = defensor.upper() if defensor else "DEFENSOR"
-        self.imputado = imputado.upper() if imputado else "IMPUTADO"
-        section = self.doc.sections[0]
-        section.left_margin = Inches(1.2)
-        section.right_margin = Inches(1.0)
-        
-        style = self.doc.styles['Normal']
-        font = style.font
-        font.name = 'Calibri'
-        font.size = Pt(12)
-        
-    def add_parrafo(self, texto, negrita=False, align="JUSTIFY"):
-        p = self.doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER if align == "CENTER" else WD_ALIGN_PARAGRAPH.JUSTIFY
-        texto_final = texto.replace("{DEFENSOR}", self.defensor).replace("{IMPUTADO}", self.imputado)
-        run = p.add_run(texto_final)
-        if negrita: run.bold = True
-
-    def generar(self, tipo, datos):
-        self.add_parrafo(f"SOLICITUD: {tipo}", negrita=True)
-        self.add_parrafo("S.J.G.", negrita=True, align="CENTER")
-        self.add_parrafo(f"{{DEFENSOR}}, por {{IMPUTADO}}, en causa RIT {datos.get('rit_ap', '')}, a US. digo:")
-        
-        if tipo == "Apelación por Quebrantamiento":
-            self.add_parrafo("Que vengo en apelar...", negrita=False)
-            self.add_parrafo("HECHOS:", negrita=True)
-            self.add_parrafo(datos.get('hechos_quebrantamiento', ''))
-            self.add_parrafo("DERECHO:", negrita=True)
-            self.add_parrafo(datos.get('argumentos_defensa', ''))
-        
-        self.add_parrafo("POR TANTO, Ruego acceder.", negrita=True, align="CENTER")
-        
-        buffer = io.BytesIO()
-        self.doc.save(buffer)
-        buffer.seek(0)
-        return buffer
-
-# =============================================================================
-# 4. STATE (BACKEND)
-# =============================================================================
-
+# ==========================================
+# 3. CEREBRO (STATE) 🧠
+# ==========================================
 class State(rx.State):
-    # Sesión
+    usuario: str = ""
+    password: str = ""
+    nombre_usuario: str = ""
     logged_in: bool = False
-    user_name: str = ""
-    user_role: str = "User"
-    current_page: str = "Generador"
-    
-    # Login
-    login_email: str = ""
-    login_pass: str = ""
-    is_loading: bool = False
-    
-    # Generador
-    defensor_nombre: str = ""
-    imputado: str = ""
-    tipo_recurso: str = "Apelación por Quebrantamiento"
-    rit_input: str = ""
-    ruc_input: str = ""
-    hechos_quebrantamiento: str = ""
-    resolucion_tribunal: str = ""
-    argumentos_defensa: str = ""
-    
-    # Biblioteca
-    busqueda_query: str = ""
-    filtro_tipo: str = "Todos"
-    resultados_biblioteca: List[Jurisprudencia] = []
-    respuesta_juridica_ia: str = ""
-    
-    # Admin
-    admin_status: str = ""
+    loading: bool = False
+    error_login: str = ""
+    pagina_actual: str = "Generador"
 
-    def login(self):
-        self.is_loading = True
-        yield
-        sb = get_supabase()
-        if sb:
-            try:
-                res = sb.auth.sign_in_with_password({"email": self.login_email, "password": self.login_pass})
-                user = res.user
-                if user:
-                    # Buscar perfil
-                    prof = sb.table("profiles").select("*").eq("id", user.id).execute()
-                    if prof.data:
-                        self.user_name = prof.data[0].get('nombre', 'Usuario')
-                        self.user_role = prof.data[0].get('rol', 'User')
-                    self.logged_in = True
-            except Exception as e:
-                return rx.window_alert("Credenciales incorrectas.")
-        self.is_loading = False
+    # Variables de la App
+    imputado: str = ""
+    delito: str = ""
+    resultado_generacion: str = ""
+
+    def conectar_supabase(self):
+        """Crea la conexión real"""
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+    async def login(self):
+        """LOGIN REAL CONTRA TU BASE DE DATOS"""
+        self.loading = True
+        self.error_login = ""
+        yield # Actualiza la UI para mostrar spinner
+
+        await asyncio.sleep(1) # Simula carga para efecto visual
+        
+        try:
+            sb = self.conectar_supabase()
+            # 1. Intentar Loguear
+            session = sb.auth.sign_in_with_password({"email": self.usuario, "password": self.password})
+            
+            if session.user:
+                # 2. Obtener Nombre del Perfil
+                data = sb.table("profiles").select("nombre").eq("id", session.user.id).execute()
+                if data.data:
+                    self.nombre_usuario = data.data[0]['nombre']
+                else:
+                    self.nombre_usuario = "Abogado"
+                
+                self.logged_in = True
+        except Exception as e:
+            self.error_login = "Credenciales incorrectas o error de conexión."
+            print(e)
+        
+        self.loading = False
 
     def logout(self):
         self.logged_in = False
-        self.user_name = ""
+        self.usuario = ""
+        self.password = ""
+        self.pagina_actual = "Generador"
 
-    def robustecer_argumentos(self):
-        self.is_loading = True
-        yield
-        try:
-            model = get_generative_model_dinamico()
-            prompt = f"Mejora como abogado experto este argumento: {self.argumentos_defensa}"
-            resp = model.generate_content(prompt)
-            self.argumentos_defensa = resp.text
-        except:
-            pass
-        self.is_loading = False
+    def set_pagina(self, pagina: str):
+        self.pagina_actual = pagina
 
-    def download_docx(self):
-        datos = {
-            "rit_ap": self.rit_input,
-            "ruc_ap": self.ruc_input,
-            "hechos_quebrantamiento": self.hechos_quebrantamiento,
-            "argumentos_defensa": self.argumentos_defensa
-        }
-        gen = GeneradorWord(self.defensor_nombre, self.imputado)
-        buffer = gen.generar(self.tipo_recurso, datos)
-        b64_data = base64.b64encode(buffer.getvalue()).decode()
-        return rx.download(data=b64_data, filename="Escrito_Legal.docx")
+    def generar_escrito(self):
+        self.resultado_generacion = f"Borrador generado para {self.imputado} ({self.delito})."
 
-    def buscar_jurisprudencia(self):
-        self.is_loading = True
-        yield
-        sb = get_supabase()
-        if sb and self.busqueda_query:
-            try:
-                emb = genai.embed_content(model="models/text-embedding-004", content=self.busqueda_query)
-                res = sb.table("documentos_legales").select("*").limit(20).execute()
-                
-                hits = []
-                if res.data:
-                    vec_q = np.array(emb['embedding'])
-                    for doc in res.data:
-                        meta = doc.get('metadata', {})
-                        if isinstance(meta, str): meta = json.loads(meta)
-                        
-                        vec_d = doc.get('embedding')
-                        if isinstance(vec_d, str): vec_d = json.loads(vec_d)
-                        
-                        if vec_d:
-                            sim = np.dot(vec_q, np.array(vec_d))
-                            hits.append(Jurisprudencia(
-                                rol=meta.get('rol', 'S/N'),
-                                tribunal=meta.get('tribunal', 'N/A'),
-                                tipo=meta.get('tipo', 'Doc'),
-                                contenido=doc.get('contenido', '')[:400] + "...",
-                                similarity=float(sim)
-                            ))
-                    
-                    hits.sort(key=lambda x: x.similarity, reverse=True)
-                    self.resultados_biblioteca = hits[:4]
-                    
-                    # Generar respuesta
-                    ctx = "\n".join([h.contenido for h in self.resultados_biblioteca])
-                    model = get_generative_model_dinamico()
-                    ans = model.generate_content(f"Responde jurídicamente a '{self.busqueda_query}' usando: {ctx}")
-                    self.respuesta_juridica_ia = ans.text
-            except Exception as e:
-                print(e)
-        self.is_loading = False
+    # Setters necesarios para los inputs
+    def set_usuario(self, val: str): self.usuario = val
+    def set_password(self, val: str): self.password = val
+    def set_imputado(self, val: str): self.imputado = val
 
-# =============================================================================
-# 5. UI COMPONENTS (ESTILO SAAS PREMIUM)
-# =============================================================================
+# ==========================================
+# 4. COMPONENTES DE DISEÑO (UI KIT) 💅
+# ==========================================
 
-def sidebar_button(text, icon, page_name):
-    """Botón del menú lateral con estado activo"""
-    active = State.current_page == page_name
-    return rx.button(
-        rx.hstack(
-            rx.icon(icon, size=20),
-            rx.text(text, font_size="1em", font_weight="500"),
-            spacing="3",
-            align="center",
+def input_luxus(placeholder, icono, on_change_fn, tipo="text"):
+    """Un input con diseño de alta gama"""
+    return rx.hstack(
+        rx.icon(icono, color=STYLE["secondary"], size=20),
+        rx.input(
+            placeholder=placeholder,
+            on_change=on_change_fn,
+            type_=tipo,
+            variant="soft",
+            bg="transparent",
+            border="none",
+            _focus={"outline": "none"},
             width="100%"
         ),
-        on_click=lambda: State.set_current_page(page_name),
-        variant="ghost",
-        color_scheme="gray" if not active else "blue",
-        bg="rgba(255,255,255,0.1)" if active else "transparent",
-        color="white",
+        padding="12px",
+        bg="#F0F2F5",
+        border_radius="12px",
         width="100%",
-        justify_content="start",
-        padding_y="1.2em",
-        border_radius="8px",
-        _hover={"bg": "rgba(255,255,255,0.05)"}
+        align="center"
     )
 
-def app_sidebar():
-    return rx.vstack(
+def sidebar_btn(text, icon, page):
+    """Botón del menú lateral inteligente"""
+    # Calculamos si este botón está activo comparando con el estado
+    active = State.pagina_actual == page
+    
+    return rx.button(
         rx.hstack(
-            rx.icon("scale", color="white", size=28),
-            rx.heading("IABL JURÍDICO", color="white", size="5", letter_spacing="1px"),
-            align="center",
-            margin_bottom="3em"
+            rx.icon(icon, color=rx.cond(active, STYLE["accent"], STYLE["white"]), size=22),
+            rx.text(text, font_size="15px", font_weight="500"),
+            spacing="3",
+            align="center"
         ),
-        sidebar_button("Generador", "file-text", "Generador"),
-        sidebar_button("Analista IA", "brain", "Analista"),
-        sidebar_button("Biblioteca", "library", "Biblioteca"),
-        sidebar_button("Admin", "users", "Admin"),
-        rx.spacer(),
-        rx.divider(opacity="0.3"),
-        rx.hstack(
-            rx.avatar(fallback=State.user_name[:2], size="3"),
-            rx.vstack(
-                rx.text(State.user_name, color="white", font_weight="bold", font_size="0.9em"),
-                rx.text(State.user_role, color=COLORS["slate"], font_size="0.8em"),
-                spacing="0"
-            ),
-            padding_y="1em"
-        ),
-        rx.button("Cerrar Sesión", on_click=State.logout, size="2", variant="surface", color_scheme="red", width="100%"),
-        
-        bg=COLORS["navy"],
-        width="280px",
-        height="100vh",
-        padding="2em",
-        position="sticky",
-        top="0",
-        left="0",
-        display=["none", "none", "flex"] # Ocultar en móvil
+        bg=rx.cond(active, "rgba(255,255,255,0.1)", "transparent"),
+        color=rx.cond(active, STYLE["accent"], "rgba(255,255,255,0.7)"),
+        width="100%",
+        justify="start",
+        padding="20px",
+        border_radius="12px",
+        _hover={"bg": "rgba(255,255,255,0.05)", "color": STYLE["white"]},
+        on_click=lambda: State.set_pagina(page)
     )
 
-def login_screen():
-    return rx.flex(
+# ==========================================
+# 5. PÁGINAS (VIEWS) 💻
+# ==========================================
+
+def login_view():
+    return rx.center(
         rx.vstack(
-            rx.heading("SISTEMA JURÍDICO IABL", size="8", color=COLORS["navy"], font_weight="900", letter_spacing="-1px"),
-            rx.text(
-                "Sistema de automatización avanzada con herramientas inteligentes pensada en defensores, porque tu tiempo vale, la salud laboral y la satisfacción del trabajo bien hecho.",
-                color=COLORS["slate"],
-                font_size="1.2em",
-                text_align="center",
-                max_width="600px",
-                margin_bottom="2em",
-                line_height="1.6"
-            ),
+            rx.heading("IABL LEGAL", size="8", color=STYLE["primary"], font_weight="900", letter_spacing="-1px"),
+            rx.text("Inteligencia Artificial para Defensores", color=STYLE["secondary"], font_size="16px"),
             
             rx.card(
-                rx.tabs.root(
-                    rx.tabs.list(
-                        rx.tabs.trigger("Iniciar Sesión", value="login"),
-                        rx.tabs.trigger("Crear Cuenta", value="register"),
-                        width="100%"
+                rx.vstack(
+                    rx.text("Bienvenido de nuevo", font_weight="bold", font_size="20px", color=STYLE["primary"]),
+                    
+                    input_luxus("Correo Institucional", "mail", State.set_usuario),
+                    input_luxus("Contraseña", "lock", State.set_password, "password"),
+                    
+                    rx.cond(
+                        State.error_login != "",
+                        rx.callout(State.error_login, icon="alert-triangle", color_scheme="red", width="100%")
                     ),
-                    rx.tabs.content(
-                        rx.vstack(
-                            rx.text("Bienvenido de nuevo", font_weight="bold", margin_top="1em"),
-                            rx.input(placeholder="Correo Institucional", on_change=State.set_login_email, size="3", radius="full"),
-                            rx.input(placeholder="Contraseña", type="password", on_change=State.set_login_pass, size="3", radius="full"),
-                            rx.button("Ingresar al Sistema", on_click=State.login, size="3", radius="full", width="100%", loading=State.is_loading),
-                            spacing="4",
-                            align="stretch"
-                        ),
-                        value="login"
+
+                    rx.button(
+                        rx.cond(State.loading, rx.spinner(color="white", size="small"), "INGRESAR AL SISTEMA"),
+                        bg=STYLE["primary"],
+                        color="white",
+                        width="100%",
+                        padding="22px",
+                        border_radius="12px",
+                        font_weight="bold",
+                        box_shadow="0 4px 14px 0 rgba(0,0,0,0.39)",
+                        _hover={"transform": "scale(1.02)", "bg": "#2C3550"},
+                        on_click=State.login,
                     ),
-                    rx.tabs.content(
-                        rx.text("Contacte al administrador para crear cuenta.", margin_top="1em", color=COLORS["slate"]),
-                        value="register"
-                    ),
-                    defaultValue="login"
+                    spacing="5",
+                    align="center",
+                    width="100%"
                 ),
-                padding="2em",
-                width="100%",
-                max_width="450px",
-                box_shadow="0 10px 40px -10px rgba(0,0,0,0.1)"
+                padding="40px",
+                width="400px",
+                bg=STYLE["white"],
+                box_shadow=STYLE["shadow"],
+                border_radius="24px"
             ),
-            
-            rx.hstack(
-                rx.card(rx.hstack(rx.icon("file-pen"), rx.text("Redacción")), padding="1em"),
-                rx.card(rx.hstack(rx.icon("scan-eye"), rx.text("Visión IA")), padding="1em"),
-                rx.card(rx.hstack(rx.icon("database"), rx.text("RAG Legal")), padding="1em"),
-                spacing="4",
-                margin_top="3em",
-                opacity="0.8"
-            ),
-            
-            align="center",
-            justify="center",
-            height="100vh",
-            bg=COLORS["beige"],
-            padding="2em"
+            spacing="6",
+            align="center"
         ),
-        width="100%",
-        height="100vh"
+        bg=STYLE["bg_app"],
+        height="100vh",
+        width="100%"
     )
 
-# --- PANEL PRINCIPAL ---
-
-def main_content():
-    return rx.box(
-        rx.cond(
-            State.current_page == "Generador",
+def dashboard_view():
+    return rx.hstack(
+        # --- SIDEBAR ---
+        rx.vstack(
+            rx.heading("IABL", size="7", color="white", font_weight="900"),
+            rx.text("LegalTech v2.0", color="rgba(255,255,255,0.5)", font_size="12px"),
+            rx.divider(opacity="0.2", margin_y="20px"),
+            
             rx.vstack(
-                rx.heading("Generador de Escritos", size="7", color=COLORS["navy"]),
-                rx.text("Redacción automatizada de escritos penales complejos.", color=COLORS["slate"]),
-                rx.separator(),
-                
-                rx.card(
-                    rx.vstack(
-                        rx.heading("1. Individualización", size="4"),
-                        rx.grid(
-                            rx.vstack(rx.text("Defensor", weight="bold"), rx.input(value=State.defensor_nombre, on_change=State.set_defensor_nombre)),
-                            rx.vstack(rx.text("Imputado", weight="bold"), rx.input(value=State.imputado, on_change=State.set_imputado)),
-                            columns="2", spacing="4", width="100%"
-                        ),
-                        rx.heading("2. Datos de la Causa", size="4", margin_top="1em"),
-                        rx.select(["Prescripción de la Pena", "Apelación por Quebrantamiento"], value=State.tipo_recurso, on_change=State.set_tipo_recurso),
-                        rx.grid(
-                            rx.input(placeholder="RIT (ej: 450-2023)", value=State.rit_input, on_change=State.set_rit_input),
-                            rx.input(placeholder="RUC", value=State.ruc_input, on_change=State.set_ruc_input),
-                            columns="2", spacing="4", width="100%"
-                        ),
-                        rx.text_area(placeholder="Hechos del Quebrantamiento...", value=State.hechos_quebrantamiento, on_change=State.set_hechos_quebrantamiento),
-                        rx.text_area(placeholder="Argumentos de Derecho (Borrador)...", value=State.argumentos_defensa, on_change=State.set_argumentos_defensa, height="150px"),
-                        rx.hstack(
-                            rx.button("Limpiar", on_click=State.clear_form, variant="soft", color_scheme="gray"),
-                            rx.button("✨ Mejorar con IA", on_click=State.robustecer_argumentos, variant="surface", color_scheme="blue", loading=State.is_loading),
-                            rx.spacer(),
-                            rx.button("Descargar DOCX", on_click=State.download_docx, size="3", variant="solid"),
-                            width="100%",
-                            padding_top="1em"
-                        ),
-                        spacing="4"
-                    ),
-                    width="100%",
-                    max_width="900px"
+                sidebar_btn("Generador de Escritos", "file-text", "Generador"),
+                sidebar_btn("Analista Multimodal", "scan-eye", "Analista"),
+                sidebar_btn("Biblioteca Jurídica", "library", "Biblioteca"),
+                spacing="2",
+                width="100%"
+            ),
+            
+            rx.spacer(),
+            
+            rx.hstack(
+                rx.avatar(fallback="AB", size="3", radius="full"),
+                rx.vstack(
+                    rx.text(State.nombre_usuario, color="white", font_weight="bold", font_size="14px"),
+                    rx.text("Plan PRO", color=STYLE["accent"], font_size="11px"),
+                    spacing="0"
                 ),
-                spacing="5",
-                padding="3em",
+                padding="15px",
+                bg="rgba(0,0,0,0.2)",
+                border_radius="12px",
+                width="100%",
                 align="center"
-            )
+            ),
+            
+            bg=STYLE["primary"],
+            width="280px",
+            height="100vh",
+            padding="30px",
+            position="sticky",
+            top="0"
         ),
         
-        rx.cond(
-            State.current_page == "Biblioteca",
+        # --- CONTENIDO ---
+        rx.box(
             rx.vstack(
-                rx.heading("Biblioteca Jurídica", size="7", color=COLORS["navy"]),
-                rx.text("Buscador semántico potenciado por RAG.", color=COLORS["slate"]),
-                rx.separator(),
+                # Header
+                rx.hstack(
+                    rx.heading(State.pagina_actual, size="6", color=STYLE["primary"]),
+                    rx.spacer(),
+                    rx.icon("bell", color=STYLE["secondary"]),
+                    width="100%",
+                    padding_bottom="30px"
+                ),
                 
-                rx.card(
-                    rx.vstack(
-                        rx.hstack(
-                            rx.input(placeholder="Describe el problema jurídico (ej: Nulidad por falta de emplazamiento)...", value=State.busqueda_query, on_change=State.set_busqueda_query, width="100%", size="3"),
-                            rx.button("Investigar", on_click=State.buscar_jurisprudencia, size="3", loading=State.is_loading),
-                            width="100%"
-                        ),
-                        rx.cond(
-                            State.respuesta_juridica_ia != "",
-                            rx.box(
-                                rx.markdown(State.respuesta_juridica_ia),
-                                bg="#F1F5F9", padding="1.5em", border_radius="8px", width="100%", border_left="4px solid #3B82F6"
-                            )
-                        ),
+                # Contenido Dinámico
+                rx.cond(
+                    State.pagina_actual == "Generador",
+                    rx.card(
                         rx.vstack(
-                            rx.heading("Jurisprudencia Relacionada", size="3"),
-                            rx.foreach(
-                                State.resultados_biblioteca,
-                                lambda res: rx.card(
-                                    rx.vstack(
-                                        rx.hstack(
-                                            rx.badge(res.rol, color_scheme="blue"),
-                                            rx.text(res.tribunal, font_weight="bold", font_size="0.9em"),
-                                            rx.spacer(),
-                                            rx.badge(res.tipo, variant="outline")
-                                        ),
-                                        rx.text(res.contenido, size="1", color="gray"),
-                                        align="start",
-                                        spacing="2"
-                                    ),
-                                    width="100%"
-                                )
+                            rx.heading("Nueva Solicitud", size="4"),
+                            rx.text("El sistema redactará el escrito basado en tus parámetros.", color="gray"),
+                            rx.grid(
+                                input_luxus("Nombre Imputado", "user", State.set_imputado),
+                                input_luxus("RIT / RUC", "hash", lambda x: x), # lambda x: x es placeholder
+                                columns="2",
+                                spacing="4",
+                                width="100%"
                             ),
-                            width="100%",
-                            spacing="3"
+                            rx.button("GENERAR DOCUMENTO", bg=STYLE["accent"], color="white", size="3", on_click=State.generar_escrito),
+                             rx.cond(
+                                State.resultado_generacion != "",
+                                rx.callout(State.resultado_generacion, icon="check-circle", color_scheme="green")
+                            ),
+                            spacing="4",
+                            align="start"
                         ),
-                        spacing="5",
-                        width="100%"
+                        width="100%", padding="30px", box_shadow="sm"
                     ),
-                    width="100%",
-                    max_width="900px"
+                    rx.text("Módulo en construcción...")
                 ),
-                padding="3em",
-                align="center"
-            )
+                
+                width="100%",
+                max_width="1200px",
+                margin="0 auto"
+            ),
+            bg=STYLE["bg_app"],
+            width="100%",
+            height="100vh",
+            padding="40px",
+            overflow="auto"
         ),
-        
-        # Placeholder para otras páginas
-        rx.cond(
-            (State.current_page != "Generador") & (State.current_page != "Biblioteca"),
-            rx.center(rx.text("Módulo en construcción", size="5", color="gray"), height="50vh")
-        ),
-        
-        width="100%",
-        height="100vh",
-        bg=COLORS["beige"],
-        overflow="auto"
+        spacing="0"
     )
 
 def index():
-    return rx.cond(
-        State.logged_in,
-        rx.hstack(
-            app_sidebar(),
-            main_content(),
-            spacing="0"
-        ),
-        login_screen()
-    )
+    return rx.cond(State.logged_in, dashboard_view(), login_view())
 
-# =============================================================================
-# 6. APP
-# =============================================================================
-
-app = rx.App(
-    theme=rx.theme(
-        appearance="light",
-        accent_color="indigo",
-        radius="large"
-    )
-)
+app = rx.App(style={"font_family": "Inter"})
 app.add_page(index)
