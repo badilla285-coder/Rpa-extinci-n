@@ -21,8 +21,8 @@ from typing import List, Dict, Any
 # =============================================================================
 
 # Configuración de Claves
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "") 
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+SUPABASE_URL = "https://zblcddxbhyomkasmbvyz.supabase.co"
+SUPABASE_KEY = "sb_publishable_pHMqXxI39AssehHdBs1wqA_NVjPc-FT"
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 
 if GOOGLE_API_KEY:
@@ -410,7 +410,7 @@ def app_sidebar():
         rx.divider(opacity="0.3"),
         rx.hstack(
             # FIX: CORREGIDO EL SLICING DE STRING
-            rx.avatar(fallback=State.user_name[:2], size="3"),
+            rx.avatar(fallback=State.user_name.to(str).slice(0, 2), size="3"),
             rx.vstack(rx.text(State.user_name, color="white", font_weight="bold", font_size="0.9em"), rx.text(State.user_role, color=COLORS["slate"], font_size="0.8em"), spacing="0"),
             padding_y="1em"
         ),
