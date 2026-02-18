@@ -35,8 +35,10 @@ COLORS = {
     "accent": "#D4CDCB",     # Beige
     "background": "#F4F7F6", # Gris Suave
     "text": "#161B2F",       # Texto Oscuro
-    "error": "#E53935",      # ROJO (ESTE FALTABA)
-    "success": "#43A047"     # Verde (Por si acaso)
+    "white": "#FFFFFF",      # Blanco Puro
+    "error": "#E53935",      # Rojo Error
+    "success": "#43A047",    # Verde Éxito
+    "gray": "#E0E0E0"        # Gris Borde
 }
 
 # Estilos de Componentes Reutilizables
