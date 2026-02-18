@@ -28,17 +28,20 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# BLOQUE DE COLORES CORREGIDO
+# 1. CONFIGURACIÓN Y COLORES (CORREGIDO V2) 🎨
+# ==========================================
 COLORS = {
     "primary": "#161B2F",    # Navy Profundo
     "secondary": "#5B687C",  # Slate Blue
-    "accent": "#D4CDCB",     # Beige
+    "accent": "#D4CDCB",     # Beige (Alias Accent)
+    "beige": "#D4CDCB",      # BEIGE (AGREGADO PARA CORREGIR TU ERROR)
     "background": "#F4F7F6", # Gris Suave
     "text": "#161B2F",       # Texto Oscuro
     "white": "#FFFFFF",      # Blanco Puro
     "error": "#E53935",      # Rojo Error
     "success": "#43A047",    # Verde Éxito
-    "gray": "#E0E0E0"        # Gris Borde
+    "gray": "#E0E0E0",       # Gris Borde
+    "transparent": "transparent"
 }
 
 # Estilos de Componentes Reutilizables
