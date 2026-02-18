@@ -28,14 +28,15 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# Paleta de Colores "Nórdico Legal"
+# BLOQUE DE COLORES CORREGIDO
 COLORS = {
-    "navy": "#161B2F",    # Principal / Sidebar
-    "slate": "#5B687C",   # Texto secundario / Acentos
-    "beige": "#D4CDCB",   # Bordes sutiles
-    "background": "#F4F7F6", # Fondo general
-    "white": "#FFFFFF",
-    "light_blue": "#E3F2FD", # Fondos de tarjetas activas
+    "primary": "#161B2F",    # Navy Profundo
+    "secondary": "#5B687C",  # Slate Blue
+    "accent": "#D4CDCB",     # Beige
+    "background": "#F4F7F6", # Gris Suave
+    "text": "#161B2F",       # Texto Oscuro
+    "error": "#E53935",      # ROJO (ESTE FALTABA)
+    "success": "#43A047"     # Verde (Por si acaso)
 }
 
 # Estilos de Componentes Reutilizables
