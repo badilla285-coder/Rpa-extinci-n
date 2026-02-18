@@ -111,7 +111,6 @@ class GeneradorWord:
             self.add_parrafo("DERECHO:", negrita=True)
             self.add_parrafo(datos.get('argumentos_defensa', ''))
         
-        # Lógica simplificada para otros tipos...
         elif tipo == "Prescripción de la Pena":
              self.add_parrafo("Solicito se declare la prescripción...", negrita=False)
              for c in datos.get('prescripcion_list', []):
@@ -149,6 +148,7 @@ class State(rx.State):
     hechos_quebrantamiento: str = ""
     resolucion_tribunal: str = ""
     argumentos_defensa: str = ""
+    pena_input: str = "" # Added missing var
     prescripcion_list: List[CausaPrescripcion] = []
     
     # Analista
@@ -169,7 +169,7 @@ class State(rx.State):
     admin_upload_status: str = ""
     is_ingesting: bool = False
 
-    # --- SETTERS EXPLÍCITOS (Para evitar errores de Event Chain) ---
+    # --- SETTERS EXPLÍCITOS ---
     def set_login_email_val(self, val: str): self.login_email = val
     def set_login_pass_val(self, val: str): self.login_pass = val
     def set_defensor_nombre_val(self, val: str): self.defensor_nombre = val
@@ -182,6 +182,7 @@ class State(rx.State):
     def set_contexto_analisis_val(self, val: str): self.contexto_analisis = val
     def set_busqueda_query_val(self, val: str): self.busqueda_query = val
     def set_filtro_tribunal_val(self, val: str): self.filtro_tribunal = val
+    def set_pena_input_val(self, val: str): self.pena_input = val # Added setter
 
     # --- ACCIONES ---
     def login(self):
@@ -199,7 +200,7 @@ class State(rx.State):
                         self.user_role = prof.data[0].get('rol', 'User')
                     self.logged_in = True
             except Exception:
-                pass # Manejo de error silencioso o toast
+                pass 
         self.is_loading = False
 
     def logout(self):
@@ -208,10 +209,11 @@ class State(rx.State):
 
     def add_prescripcion_item(self):
         self.prescripcion_list.append(CausaPrescripcion(
-            rit=self.rit_input, ruc=self.ruc_input, pena="Pena Pendiente"
+            rit=self.rit_input, ruc=self.ruc_input, pena=self.pena_input
         ))
         self.rit_input = ""
         self.ruc_input = ""
+        self.pena_input = ""
 
     def clear_form(self):
         self.defensor_nombre = ""
@@ -339,7 +341,7 @@ class State(rx.State):
                 reader = PyPDF2.PdfReader(io.BytesIO(data))
                 text = "".join([p.extract_text() for p in reader.pages])
                 
-                if len(text) < 50: # OCR Trigger
+                if len(text) < 50: 
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(data)
                         tmp_path = tmp.name
@@ -379,25 +381,18 @@ class State(rx.State):
 # =============================================================================
 
 def sidebar_button(text, icon, page_name):
-    active = State.current_page == page_name
-    return rx.button(
-        rx.hstack(
-            rx.icon(icon, size=20),
-            rx.text(text, font_size="1em", font_weight="500"),
-            spacing="3",
-            align="center",
-            width="100%"
+    return rx.cond(
+        State.current_page == page_name,
+        rx.button(
+            rx.hstack(rx.icon(icon, size=20), rx.text(text, font_size="1em", font_weight="500"), spacing="3", align="center", width="100%"),
+            on_click=lambda: State.set_current_page(page_name),
+            variant="ghost", color_scheme="blue", bg="rgba(255,255,255,0.1)", color="white", width="100%", justify_content="start", padding_y="1.2em", border_radius="8px"
         ),
-        on_click=lambda: State.set_current_page(page_name),
-        variant="ghost",
-        color_scheme="gray" if not active else "blue",
-        bg="rgba(255,255,255,0.1)" if active else "transparent",
-        color="white",
-        width="100%",
-        justify_content="start",
-        padding_y="1.2em",
-        border_radius="8px",
-        _hover={"bg": "rgba(255,255,255,0.05)"}
+        rx.button(
+            rx.hstack(rx.icon(icon, size=20), rx.text(text, font_size="1em", font_weight="500"), spacing="3", align="center", width="100%"),
+            on_click=lambda: State.set_current_page(page_name),
+            variant="ghost", color_scheme="gray", bg="transparent", color="white", width="100%", justify_content="start", padding_y="1.2em", border_radius="8px", _hover={"bg": "rgba(255,255,255,0.05)"}
+        )
     )
 
 def app_sidebar():
@@ -405,8 +400,7 @@ def app_sidebar():
         rx.hstack(
             rx.icon("scale", color="white", size=28),
             rx.heading("IABL JURÍDICO", color="white", size="5", letter_spacing="1px"),
-            align="center",
-            margin_bottom="3em"
+            align="center", margin_bottom="3em"
         ),
         sidebar_button("Generador", "file-text", "Generador"),
         sidebar_button("Analista IA", "brain", "Analista"),
@@ -416,76 +410,38 @@ def app_sidebar():
         rx.divider(opacity="0.3"),
         rx.hstack(
             rx.avatar(fallback=State.user_name.to(str).slice(0, 2), size="3"),
-            rx.vstack(
-                rx.text(State.user_name, color="white", font_weight="bold", font_size="0.9em"),
-                rx.text(State.user_role, color=COLORS["slate"], font_size="0.8em"),
-                spacing="0"
-            ),
+            rx.vstack(rx.text(State.user_name, color="white", font_weight="bold", font_size="0.9em"), rx.text(State.user_role, color=COLORS["slate"], font_size="0.8em"), spacing="0"),
             padding_y="1em"
         ),
         rx.button("Cerrar Sesión", on_click=State.logout, size="2", variant="surface", color_scheme="red", width="100%"),
-        
-        bg=COLORS["navy"],
-        width="280px",
-        height="100vh",
-        padding="2em",
-        position="sticky",
-        top="0",
-        left="0",
-        display=["none", "none", "flex"]
+        bg=COLORS["navy"], width="280px", height="100vh", padding="2em", position="sticky", top="0", left="0", display=["none", "none", "flex"]
     )
 
 def login_page():
     return rx.center(
         rx.vstack(
             rx.heading("SISTEMA JURÍDICO IABL", size="8", color=COLORS["navy"], text_align="center"),
-            rx.text(
-                "Automatización inteligente para defensores: tu tiempo vale.",
-                color=COLORS["slate"],
-                font_size="1.2em",
-                text_align="center",
-                max_width="600px",
-                margin_bottom="2em",
-                line_height="1.6"
-            ),
-            
+            rx.text("Automatización inteligente para defensores: tu tiempo vale.", color=COLORS["slate"], font_style="italic", font_size="1.2em", text_align="center", max_width="600px", margin_bottom="2em", line_height="1.6"),
             rx.card(
                 rx.tabs.root(
-                    rx.tabs.list(
-                        rx.tabs.trigger("Iniciar Sesión", value="login"),
-                        rx.tabs.trigger("Crear Cuenta", value="register"),
-                        width="100%"
-                    ),
+                    rx.tabs.list(rx.tabs.trigger("Iniciar Sesión", value="login"), rx.tabs.trigger("Crear Cuenta", value="register"), width="100%"),
                     rx.tabs.content(
                         rx.vstack(
                             rx.text("Bienvenido de nuevo", font_weight="bold", margin_top="1em"),
                             rx.input(placeholder="Correo", on_change=State.set_login_email_val, size="3", radius="full"),
                             rx.input(placeholder="Contraseña", type="password", on_change=State.set_login_pass_val, size="3", radius="full"),
                             rx.button("Ingresar", on_click=State.login, size="3", radius="full", width="100%", loading=State.is_loading),
-                            spacing="4",
-                            align="stretch"
-                        ),
-                        value="login"
+                            spacing="4", align="stretch"
+                        ), value="login"
                     ),
-                    rx.tabs.content(
-                        rx.text("Contacte al administrador.", margin_top="1em", color=COLORS["slate"]),
-                        value="register"
-                    ),
+                    rx.tabs.content(rx.text("Contacte al administrador.", margin_top="1em", color=COLORS["slate"]), value="register"),
                     defaultValue="login"
                 ),
-                padding="2em",
-                width="100%",
-                max_width="450px",
-                box_shadow="0 10px 40px -10px rgba(0,0,0,0.1)"
+                padding="2em", width="100%", max_width="450px", box_shadow="0 10px 40px -10px rgba(0,0,0,0.1)"
             ),
-            align="center",
-            justify="center",
-            height="100vh",
-            bg=COLORS["beige"],
-            padding="2em"
+            align="center", justify="center", height="100vh", bg=COLORS["beige"], padding="2em"
         ),
-        width="100%",
-        height="100vh"
+        width="100%", height="100vh"
     )
 
 # --- PANEL PRINCIPAL ---
@@ -497,7 +453,6 @@ def main_content():
             rx.vstack(
                 rx.heading("Generador de Escritos", size="7", color=COLORS["navy"]),
                 rx.separator(),
-                
                 rx.card(
                     rx.vstack(
                         rx.heading("1. Individualización", size="4"),
@@ -513,8 +468,6 @@ def main_content():
                             rx.input(placeholder="RUC", value=State.ruc_input, on_change=State.set_ruc_input_val),
                             columns="2", spacing="4", width="100%"
                         ),
-                        
-                        # Renderizado Condicional de Áreas Específicas
                         rx.cond(
                             State.tipo_recurso == "Apelación por Quebrantamiento",
                             rx.vstack(
@@ -527,31 +480,25 @@ def main_content():
                         rx.cond(
                             State.tipo_recurso == "Prescripción de la Pena",
                             rx.vstack(
-                                rx.input(placeholder="Pena", value=State.pena_input, on_change=State.set_pena_input),
+                                rx.input(placeholder="Pena", value=State.pena_input, on_change=State.set_pena_input_val),
                                 rx.button("Agregar Causa", on_click=State.add_prescripcion_item),
                                 rx.foreach(State.prescripcion_list, lambda x: rx.text(f"- RIT {x.rit}: {x.pena}")),
                                 width="100%", spacing="3"
                             )
                         ),
-
                         rx.hstack(
                             rx.button("Limpiar", on_click=State.clear_form, variant="soft"),
                             rx.spacer(),
                             rx.button("Descargar DOCX", on_click=State.download_docx, size="3", variant="solid"),
-                            width="100%",
-                            padding_top="1em"
+                            width="100%", padding_top="1em"
                         ),
                         spacing="4"
                     ),
-                    width="100%",
-                    max_width="900px"
+                    width="100%", max_width="900px"
                 ),
-                spacing="5",
-                padding="3em",
-                align="center"
+                spacing="5", padding="3em", align="center"
             )
         ),
-        
         rx.cond(
             State.current_page == "Biblioteca",
             rx.vstack(
@@ -566,10 +513,7 @@ def main_content():
                         ),
                         rx.cond(
                             State.respuesta_juridica_ia != "",
-                            rx.box(
-                                rx.markdown(State.respuesta_juridica_ia),
-                                bg="#F1F5F9", padding="1.5em", border_radius="8px", width="100%", border_left="4px solid #3B82F6"
-                            )
+                            rx.box(rx.markdown(State.respuesta_juridica_ia), bg="#F1F5F9", padding="1.5em", border_radius="8px", width="100%", border_left="4px solid #3B82F6")
                         ),
                         rx.vstack(
                             rx.heading("Jurisprudencia Relacionada", size="3"),
@@ -584,37 +528,27 @@ def main_content():
                                             rx.badge(res.tipo, variant="outline")
                                         ),
                                         rx.text(res.contenido, size="2", color="gray"),
-                                        align="start",
-                                        spacing="2"
+                                        align="start", spacing="2"
                                     ),
                                     width="100%"
                                 )
                             ),
-                            width="100%",
-                            spacing="3"
+                            width="100%", spacing="3"
                         ),
-                        spacing="5",
-                        width="100%"
+                        spacing="5", width="100%"
                     ),
-                    width="100%",
-                    max_width="900px"
+                    width="100%", max_width="900px"
                 ),
-                padding="3em",
-                align="center"
+                padding="3em", align="center"
             )
         ),
-        
-        # Analista Placeholder
         rx.cond(
             State.current_page == "Analista",
             rx.vstack(
                 rx.heading("Analista Multimodal", size="7", color=COLORS["navy"]),
                 rx.card(
                     rx.vstack(
-                        rx.upload(
-                            rx.text("Arrastra archivos aquí"), id="upload_analista", multiple=True, 
-                            border=f"2px dashed {COLORS['beige']}", padding="2em"
-                        ),
+                        rx.upload(rx.text("Arrastra archivos aquí"), id="upload_analista", multiple=True, border=f"2px dashed {COLORS['beige']}", padding="2em"),
                         rx.button("Analizar", on_click=State.handle_analisis_upload(rx.upload_files("upload_analista")), loading=State.is_analyzing),
                         rx.cond(State.analisis_result != "", rx.markdown(State.analisis_result)),
                         width="100%", spacing="4"
@@ -624,18 +558,13 @@ def main_content():
                 padding="3em", align="center"
             )
         ),
-
-        # Admin Placeholder
         rx.cond(
             State.current_page == "Admin",
             rx.vstack(
                 rx.heading("Panel de Ingesta", size="7", color=COLORS["navy"]),
                 rx.card(
                     rx.vstack(
-                        rx.upload(
-                            rx.text("Arrastra PDFs aquí"), id="upload_ingesta", multiple=True, 
-                            border=f"2px dashed {COLORS['beige']}", padding="2em"
-                        ),
+                        rx.upload(rx.text("Arrastra PDFs aquí"), id="upload_ingesta", multiple=True, border=f"2px dashed {COLORS['beige']}", padding="2em"),
                         rx.button("Ingestar", on_click=State.handle_ingesta_upload(rx.upload_files("upload_ingesta")), loading=State.is_ingesting),
                         rx.text(State.admin_upload_status),
                         width="100%", spacing="4"
@@ -645,22 +574,14 @@ def main_content():
                 padding="3em", align="center"
             )
         ),
-        
-        width="100%",
-        height="100vh",
-        bg=COLORS["beige"],
-        overflow="auto"
+        width="100%", height="100vh", bg=COLORS["beige"], overflow="auto"
     )
 
 def index():
     return rx.cond(
         State.logged_in,
-        rx.hstack(
-            app_sidebar(),
-            main_content(),
-            spacing="0"
-        ),
-        login_screen()
+        rx.hstack(app_sidebar(), main_content(), spacing="0"),
+        login_page()
     )
 
 # =============================================================================
@@ -668,10 +589,6 @@ def index():
 # =============================================================================
 
 app = rx.App(
-    theme=rx.theme(
-        appearance="light",
-        accent_color="indigo",
-        radius="large"
-    )
+    theme=rx.theme(appearance="light", accent_color="indigo", radius="large")
 )
 app.add_page(index)
