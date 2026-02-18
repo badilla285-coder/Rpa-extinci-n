@@ -20,7 +20,7 @@ from typing import List, Dict, Any
 # 1. CONFIGURACIÓN Y ESTILOS
 # =============================================================================
 
-# Configuración de Claves (Variables de Entorno o Strings directos para pruebas locales)
+# Configuración de Claves
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "") 
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
@@ -148,7 +148,7 @@ class State(rx.State):
     hechos_quebrantamiento: str = ""
     resolucion_tribunal: str = ""
     argumentos_defensa: str = ""
-    pena_input: str = "" # Added missing var
+    pena_input: str = "" 
     prescripcion_list: List[CausaPrescripcion] = []
     
     # Analista
@@ -182,7 +182,7 @@ class State(rx.State):
     def set_contexto_analisis_val(self, val: str): self.contexto_analisis = val
     def set_busqueda_query_val(self, val: str): self.busqueda_query = val
     def set_filtro_tribunal_val(self, val: str): self.filtro_tribunal = val
-    def set_pena_input_val(self, val: str): self.pena_input = val # Added setter
+    def set_pena_input_val(self, val: str): self.pena_input = val 
 
     # --- ACCIONES ---
     def login(self):
@@ -409,7 +409,8 @@ def app_sidebar():
         rx.spacer(),
         rx.divider(opacity="0.3"),
         rx.hstack(
-            rx.avatar(fallback=State.user_name.to(str).slice(0, 2), size="3"),
+            # FIX: CORREGIDO EL SLICING DE STRING
+            rx.avatar(fallback=State.user_name[:2], size="3"),
             rx.vstack(rx.text(State.user_name, color="white", font_weight="bold", font_size="0.9em"), rx.text(State.user_role, color=COLORS["slate"], font_size="0.8em"), spacing="0"),
             padding_y="1em"
         ),
@@ -453,6 +454,7 @@ def main_content():
             rx.vstack(
                 rx.heading("Generador de Escritos", size="7", color=COLORS["navy"]),
                 rx.separator(),
+                
                 rx.card(
                     rx.vstack(
                         rx.heading("1. Individualización", size="4"),
