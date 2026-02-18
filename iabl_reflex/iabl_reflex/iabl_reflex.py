@@ -28,20 +28,17 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
 
-# 1. CONFIGURACIÓN Y COLORES (CORREGIDO V2) 🎨
-# ==========================================
+# Paleta de Colores "Nórdico Legal" COMPLETA (Corrección de KeyError)
 COLORS = {
-    "primary": "#161B2F",    # Navy Profundo
-    "secondary": "#5B687C",  # Slate Blue
-    "accent": "#D4CDCB",     # Beige (Alias Accent)
-    "beige": "#D4CDCB",      # BEIGE (AGREGADO PARA CORREGIR TU ERROR)
-    "background": "#F4F7F6", # Gris Suave
-    "text": "#161B2F",       # Texto Oscuro
-    "white": "#FFFFFF",      # Blanco Puro
-    "error": "#E53935",      # Rojo Error
-    "success": "#43A047",    # Verde Éxito
-    "gray": "#E0E0E0",       # Gris Borde
-    "transparent": "transparent"
+    "navy": "#161B2F",       # Principal / Sidebar
+    "slate": "#5B687C",      # Texto secundario / Acentos
+    "beige": "#D4CDCB",      # Bordes sutiles
+    "background": "#F4F7F6", # Fondo general
+    "white": "#FFFFFF",
+    "light_blue": "#E3F2FD", # Fondos de tarjetas activas
+    "success": "#2E7D32",    # Verde éxito (Agregado para evitar errores)
+    "error": "#C62828",      # Rojo error (Agregado para evitar errores)
+    "warning": "#EF6C00"     # Naranja advertencia
 }
 
 # Estilos de Componentes Reutilizables
@@ -68,6 +65,7 @@ style_button_primary = {
     "width": "100%",
     "padding": "1em",
     "border_radius": "8px",
+    "cursor": "pointer",
 }
 
 # =============================================================================
