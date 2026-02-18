@@ -1,27 +1,25 @@
 [theme]
-# OBLIGATORIO: Fuerza el modo claro para evitar errores de texto invisible
 base = "light"
 
-# TU PALETA DE COLORES PERSONALIZADA
+# TU PALETA NÓRDICA (Extraída de la imagen)
 
-# Color Principal (Botones, deslizadores, acentos)
-# Usamos tu "Azul Pizarra" (#5B687C) para un look serio pero moderno.
+# Color Principal (Botones, Acentos, Deslizadores)
+# Usamos el Azul Pizarra (#5B687C) para un look profesional y calmado.
 primaryColor = "#5B687C"
 
 # Fondo Principal
-# Blanco puro para máxima limpieza y legibilidad profesional.
+# Blanco puro para limpieza máxima.
 backgroundColor = "#FFFFFF"
 
-# Fondo Secundario (Barra lateral, cajas de input, mensajes de sistema)
-# Usamos un gris muy suave (casi blanco) para dar profundidad sin ensuciar.
+# Fondo Secundario (Barra lateral, inputs)
+# Usamos el tono "Mushroom/Beige" muy suave (#F4F7F6) para dar calidez sin ensuciar.
 secondaryBackgroundColor = "#F4F7F6"
 
 # Color del Texto
-# Usamos tu "Azul Marino Profundo" (#161B2F). Es mejor que el negro puro, da elegancia.
+# El Azul Navy Oscuro (#161B2F) para lectura perfecta y alto contraste.
 textColor = "#161B2F"
 
-# Fuente
-# Sans serif es la más moderna y limpia para lectura en pantalla.
+# Tipografía Moderna
 font = "sans serif"
 
 [server]
