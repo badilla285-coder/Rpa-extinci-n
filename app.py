@@ -25,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Profesional: Alto Contraste, Elegancia y Animaciones + LOGIN HERO
+# CSS Profesional: Diseño "Nórdico Legal" (Navy, Slate, Beige)
 st.markdown("""
     <style>
     /* Animación de entrada */
@@ -36,27 +36,27 @@ st.markdown("""
     
     /* Tipografía y Fondo General */
     .main {
-        background-color: #f4f7f6; /* Fondo gris muy suave y moderno */
+        background-color: #f4f7f6; /* Fondo gris muy suave */
         font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
         color: #333333;
     }
     
-    /* Encabezados */
+    /* Encabezados - Navy Profundo */
     h1 { 
-        color: #0d47a1; 
+        color: #161B2F !important; 
         font-weight: 800; 
-        border-bottom: 3px solid #0d47a1; 
+        border-bottom: 2px solid #D4CDCB; /* Beige Suave */
         padding-bottom: 15px; 
         letter-spacing: -0.5px;
         text-transform: uppercase;
         font-size: 1.8rem;
     }
-    h2, h3 { color: #1565c0; font-weight: 600; }
+    h2, h3 { color: #161B2F !important; font-weight: 600; }
     
-    /* Botones Premium */
+    /* Botones Premium - Navy Profundo */
     .stButton>button {
-        background-color: #0d47a1;
-        color: white;
+        background-color: #161B2F !important;
+        color: white !important;
         border-radius: 8px;
         font-weight: 600;
         border: none;
@@ -68,7 +68,7 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
     .stButton>button:hover {
-        background-color: #1976d2;
+        background-color: #2C3550 !important; /* Un tono más claro para hover */
         transform: translateY(-2px);
         box-shadow: 0 6px 12px rgba(0,0,0,0.15);
     }
@@ -78,8 +78,8 @@ st.markdown("""
         padding: 20px;
         border-radius: 10px;
         background: #ffffff;
-        border-left: 5px solid #0d47a1;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        border-left: 5px solid #161B2F;
+        box-shadow: 0 4px 15px rgba(22, 27, 47, 0.05);
         color: #212121;
         margin-bottom: 20px;
     }
@@ -89,12 +89,13 @@ st.markdown("""
         background: white;
         padding: 2rem;
         border-radius: 15px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        border: 1px solid #D4CDCB; /* Beige Suave */
+        box-shadow: 0 4px 20px rgba(22, 27, 47, 0.08); /* Sombra Navy sutil */
         text-align: center;
         margin-bottom: 2rem;
     }
     .hero-title {
-        color: #0d47a1;
+        color: #161B2F;
         font-weight: 800;
         font-size: 2.5rem;
         margin-bottom: 0.5rem;
@@ -102,7 +103,7 @@ st.markdown("""
     }
     .hero-subtitle {
         font-size: 1.2rem;
-        color: #455A64;
+        color: #5B687C; /* Slate Blue */
         margin-bottom: 30px;
         font-style: italic;
         text-align: center;
@@ -110,25 +111,27 @@ st.markdown("""
     }
     .feature-card {
         background: white;
-        border: 1px solid #E0E0E0;
+        border: 1px solid #D4CDCB; /* Beige Suave */
         border-radius: 10px;
         padding: 1.5rem;
         text-align: center;
         transition: transform 0.3s;
         height: 100%;
+        box-shadow: 0 4px 10px rgba(22, 27, 47, 0.03);
     }
     .feature-card:hover {
         transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        box-shadow: 0 10px 20px rgba(22, 27, 47, 0.08);
     }
     .feature-icon {
         font-size: 2rem;
         margin-bottom: 1rem;
         display: block;
+        color: #5B687C;
     }
     .feature-title {
         font-weight: 700;
-        color: #1565c0;
+        color: #161B2F;
         margin-bottom: 0.5rem;
         display: block;
     }
@@ -148,39 +151,59 @@ st.markdown("""
     
     /* Estilo para el resumen dinámico y respuestas jurídicas */
     .resumen-dinamico {
-        background-color: #e3f2fd;
-        border-left: 5px solid #1976d2;
+        background-color: #F8F9FA;
+        border-left: 5px solid #161B2F;
         padding: 20px;
         border-radius: 8px;
         margin-bottom: 15px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border: 1px solid #D4CDCB;
     }
     
     /* Badges para Biblioteca */
     .badge-tipo {
-        background-color: #e8f5e9;
-        color: #2e7d32;
+        background-color: #ECEFF1;
+        color: #161B2F;
         padding: 4px 8px;
         border-radius: 12px;
         font-size: 0.8rem;
         font-weight: 600;
-        border: 1px solid #c8e6c9;
+        border: 1px solid #D4CDCB;
     }
     .badge-rol {
-        background-color: #e3f2fd;
-        color: #1565c0;
+        background-color: #E8EAF6;
+        color: #5B687C;
         padding: 4px 8px;
         border-radius: 12px;
         font-size: 0.8rem;
         font-weight: 600;
         margin-left: 5px;
-        border: 1px solid #bbdefb;
+        border: 1px solid #C5CAE9;
+    }
+    
+    /* Ajustes específicos Landing */
+    .feature-box {
+        text-align: center;
+        padding: 1.5rem;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #D4CDCB;
+        transition: transform 0.3s;
+    }
+    .feature-box:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(22, 27, 47, 0.08);
+    }
+    .feature-text {
+        color: #161B2F;
+        font-weight: 700;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 2. CONFIGURACIÓN SERVICIOS
+# 2. CONFIGURACIÓN SERVICIOS (SEGURIDAD REFORZADA)
 # =============================================================================
 
 # === CONFIGURACIÓN SEGURA (SECRETS) ===
@@ -272,14 +295,15 @@ def analizar_metadata_profunda(texto_completo):
             "tipo": "Documento Legal"
         }
 
-SUPABASE_URL = "https://zblcddxbhyomkasmbvyz.supabase.co"
-SUPABASE_KEY = "sb_publishable_pHMqXxI39AssehHdBs1wqA_NVjPc-FT"
-
+# === INICIALIZACIÓN SEGURA DE SUPABASE (SECRETOS) ===
 @st.cache_resource
 def init_supabase():
     try:
-        return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except:
+        url = st.secrets["SUPABASE_URL"]
+        key = st.secrets["SUPABASE_KEY"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error("⚠️ Error de configuración: Faltan las claves de Supabase en Secrets (.streamlit/secrets.toml).")
         return None
 
 supabase = init_supabase()
@@ -584,7 +608,7 @@ if "defensor_nombre" not in st.session_state:
 # 7. PANTALLA DE LOGIN (REDISEÑO HERO VERTICAL)
 # =============================================================================
 def login_screen():
-    # CSS Personalizado para Landing Page
+    # CSS Personalizado para Landing Page (Con la nueva paleta)
     st.markdown("""
         <style>
         /* Estilos Generales Landing */
@@ -611,8 +635,8 @@ def login_screen():
             background-color: white;
             padding: 3rem;
             border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            border: 1px solid #E0E0E0;
+            box-shadow: 0 4px 20px rgba(22, 27, 47, 0.08); /* Sombra Navy sutil */
+            border: 1px solid #D4CDCB; /* Beige Suave */
         }
         /* Botones */
         .stButton>button {
@@ -636,15 +660,18 @@ def login_screen():
             background: white;
             border-radius: 15px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            border: 1px solid #D4CDCB; /* Beige Suave */
             transition: transform 0.3s;
         }
         .feature-box:hover {
             transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(22, 27, 47, 0.08);
         }
         .feature-icon {
             font-size: 2.5rem;
             margin-bottom: 1rem;
             display: block;
+            color: #5B687C;
         }
         .feature-text {
             color: #161B2F;
