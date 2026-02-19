@@ -1537,116 +1537,180 @@ def main_app():
         else:
             st.warning("⚠️ Esperando archivo de audio para iniciar el análisis.")
 
-    # === TAB 4: BIBLIOTECA INTELIGENTE (RAG MEJORADO + ANALISIS) ===
+ # =============================================================================
+    # === TAB 4: BIBLIOTECA JURÍDICA INTELIGENTE & ANÁLISIS MAESTRO (RAG + RPA) ===
+    # =============================================================================
     with tabs[3]:
-        st.header("📚 Biblioteca Jurídica Inteligente (Investigación RAG)")
+        st.header("📚 Biblioteca Jurídica Inteligente & Cerebro Estratégico")
         
-        modo_biblio = st.radio("Herramienta", ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito"], horizontal=True)
+        # Selector de Herramienta en la Biblioteca
+        modo_biblio = st.radio(
+            "Selecciona Herramienta de Investigación:", 
+            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito", "🧠 Estrategia Global (Master RPA)"], 
+            horizontal=True,
+            key="selector_biblioteca_maestra"
+        )
         
+        st.divider()
+
+        # --- OPCIÓN 1: BUSCADOR JURÍDICO AVANZADO (RAG) ---
         if modo_biblio == "🔍 Buscador Jurídico Avanzado":
-            st.info("Buscador semántico potenciado por IA: Filtra, encuentra similitudes y genera respuestas jurídicas.")
+            st.info("Buscador semántico potenciado por IA: Filtra, encuentra similitudes y genera respuestas jurídicas basadas en tu base de datos privada.")
             
-            # Layout de Filtros
+            # Layout de Filtros de Búsqueda
             col_filtros = st.columns(3)
             filtro_tipo = col_filtros[0].selectbox("Tipo de Documento", ["Todos", "Sentencia Condenatoria", "Sentencia Absolutoria", "Recurso de Nulidad", "Recurso de Amparo", "Recurso de Apelación", "Doctrina/Artículo", "Ley/Normativa"])
             filtro_tribunal = col_filtros[1].text_input("Tribunal (Opcional)", placeholder="Ej: Suprema, San Miguel")
             query_busqueda = col_filtros[2].text_input("Tema Jurídico / Consulta", placeholder="Ej: Nulidad por falta de fundamentación")
             
-            if st.button("🔎 Investigar"):
-                with st.spinner("Consultando bases de datos y generando respuesta..."):
-                    try:
-                        # 1. Obtener Embedding de la consulta
-                        modelo_dinamico = get_embedding_model()
-                        emb_resp = genai.embed_content(
-                            model=modelo_dinamico,
-                            content=query_busqueda,
-                            task_type="retrieval_query"
-                        )
-                        vector_consulta = emb_resp['embedding']
-                        
-                        if vector_consulta:
-                            # 2. Construir Query a Supabase con filtros
-                            query_db = supabase.table("documentos_legales").select("*").limit(100)
+            if st.button("🔎 Ejecutar Investigación RAG", use_container_width=True):
+                if not query_busqueda:
+                    st.warning("Escribe un tema o consulta para buscar.")
+                else:
+                    with st.spinner("Consultando bases de datos y generando respuesta estratégica..."):
+                        try:
+                            # 1. Obtener Embedding de la consulta
+                            modelo_emb = get_embedding_model()
+                            emb_resp = genai.embed_content(
+                                model=modelo_emb,
+                                content=query_busqueda,
+                                task_type="retrieval_query"
+                            )
+                            vector_consulta = emb_resp['embedding']
                             
-                            if filtro_tipo != "Todos":
-                                query_db = query_db.eq('metadata->>tipo', filtro_tipo)
-                            # Nota: El filtro de tribunal es texto parcial, mejor hacerlo en Python si no es exacto
-                            
-                            res = query_db.execute()
-                            
-                            if res.data:
-                                resultados_scores = []
-                                for doc in res.data:
-                                    vec_doc = doc.get('embedding')
-                                    # CORRECCIÓN ERROR TIPOS
-                                    if isinstance(vec_doc, str):
-                                        vec_doc = json.loads(vec_doc)
-                                    
-                                    # Filtro tribunal parcial en Python
-                                    meta = doc['metadata']
-                                    if isinstance(meta, str): meta = json.loads(meta)
-                                    
-                                    if filtro_tribunal and filtro_tribunal.lower() not in meta.get('tribunal', '').lower():
-                                        continue
-
-                                    if vec_doc:
-                                        v_a = np.array(vector_consulta)
-                                        v_b = np.array(vec_doc)
-                                        sim = np.dot(v_a, v_b) / (np.linalg.norm(v_a) * np.linalg.norm(v_b))
-                                        resultados_scores.append((sim, doc, meta))
+                            if vector_consulta:
+                                # 2. Consultar Supabase
+                                query_db = supabase.table("documentos_legales").select("*").limit(100)
+                                if filtro_tipo != "Todos":
+                                    query_db = query_db.eq('metadata->>tipo', filtro_tipo)
                                 
-                                # Ordenar top 5
-                                resultados_scores.sort(key=lambda x: x[0], reverse=True)
-                                top_resultados = resultados_scores[:5]
+                                res = query_db.execute()
                                 
-                                if top_resultados:
-                                    # 3. GENERACIÓN DE RESPUESTA JURÍDICA (RAG)
-                                    contexto_rag = ""
-                                    for i, (score, doc, meta) in enumerate(top_resultados):
-                                        contexto_rag += f"FRAGMENTO {i+1} (Rol: {meta.get('rol')}, Tribunal: {meta.get('tribunal')}): {doc['contenido'][:800]}...\n\n"
-                                    
-                                    prompt_rag = f"""
-                                    Eres un abogado investigador senior.
-                                    Basado EXCLUSIVAMENTE en estos fragmentos de jurisprudencia recuperados:
-                                    {contexto_rag}
-                                    
-                                    Redacta una respuesta jurídica directa a la consulta: '{query_busqueda}'.
-                                    Cita obligatoriamente los ROLES y TRIBUNALES de cada fragmento usado para respaldar tu respuesta.
-                                    Si la información no es suficiente, indícalo.
-                                    """
-                                    
-                                    model_resp = get_generative_model_dinamico()
-                                    resp_juridica = model_resp.generate_content(prompt_rag)
-                                    
-                                    st.markdown("<div class='resumen-dinamico'><h4>⚖️ RESPUESTA JURÍDICA INTELIGENTE</h4>" + resp_juridica.text + "</div>", unsafe_allow_html=True)
-                                    
-                                    st.divider()
-                                    st.caption("FUENTES CONSULTADAS:")
-                                    
-                                    # 4. Mostrar Fuentes con Badges
-                                    for score, doc, meta in top_resultados:
-                                        tipo_doc = meta.get('tipo', 'Doc')
-                                        rol_doc = meta.get('rol', 'S/N')
-                                        trib_doc = meta.get('tribunal', '')
+                                if res.data:
+                                    resultados_scores = []
+                                    for doc in res.data:
+                                        vec_doc = doc.get('embedding')
+                                        if isinstance(vec_doc, str):
+                                            vec_doc = json.loads(vec_doc)
                                         
-                                        with st.expander(f"{trib_doc} - {rol_doc} (Relevancia: {int(score*100)}%)"):
-                                            st.markdown(f"<span class='badge-tipo'>{tipo_doc}</span> <span class='badge-rol'>{rol_doc}</span>", unsafe_allow_html=True)
-                                            st.markdown(f"**Resultado:** {meta.get('resultado', '-')}")
-                                            st.write(doc['contenido'][:1000] + "...")
-                                            st.button("Copiar Cita", key=f"btn_{doc['id']}")
+                                        # Metadatos
+                                        meta = doc['metadata']
+                                        if isinstance(meta, str): meta = json.loads(meta)
+                                        
+                                        # Filtro de tribunal en Python (Búsqueda parcial)
+                                        if filtro_tribunal and filtro_tribunal.lower() not in meta.get('tribunal', '').lower():
+                                            continue
+
+                                        if vec_doc:
+                                            # Cálculo de Similitud Coseno con Numpy
+                                            v_a = np.array(vector_consulta)
+                                            v_b = np.array(vec_doc)
+                                            sim = np.dot(v_a, v_b) / (np.linalg.norm(v_a) * np.linalg.norm(v_b))
+                                            resultados_scores.append((sim, doc, meta))
+                                    
+                                    # Ordenamos por relevancia (Top 5)
+                                    resultados_scores.sort(key=lambda x: x[0], reverse=True)
+                                    top_resultados = resultados_scores[:5]
+                                    
+                                    if top_resultados:
+                                        # 3. Generación de Respuesta Jurídica (RAG)
+                                        contexto_rag = ""
+                                        for i, (score, doc, meta) in enumerate(top_resultados):
+                                            contexto_rag += f"FUENTE {i+1} (Rol: {meta.get('rol')}, Tribunal: {meta.get('tribunal')}): {doc['contenido'][:800]}...\n\n"
+                                        
+                                        prompt_rag = f"""
+                                        Eres un Abogado Investigador Senior.
+                                        Basado EXCLUSIVAMENTE en estos fragmentos de jurisprudencia recuperados:
+                                        {contexto_rag}
+                                        
+                                        Redacta una respuesta jurídica técnica y directa a la consulta: '{query_busqueda}'.
+                                        Cita obligatoriamente los ROLES y TRIBUNALES de cada fragmento usado.
+                                        Si la información es insuficiente, indícalo.
+                                        """
+                                        
+                                        model_resp = get_generative_model_dinamico()
+                                        resp_ia = model_resp.generate_content(prompt_rag)
+                                        texto_juridico = safe_get_text(resp_ia)
+                                        
+                                        st.markdown("<div class='resumen-dinamico'><h4>⚖️ RESPUESTA JURÍDICA INTELIGENTE</h4>" + texto_juridico + "</div>", unsafe_allow_html=True)
+                                        
+                                        st.divider()
+                                        st.caption("🔍 FUENTES ORIGINALES IDENTIFICADAS:")
+                                        
+                                        for score, doc, meta in top_resultados:
+                                            with st.expander(f"{meta.get('tribunal', 'Tribunal')} - {meta.get('rol', 'S/R')} (Similitud: {int(score*100)}%)"):
+                                                st.info(f"**Tipo:** {meta.get('tipo')} | **Resultado:** {meta.get('resultado')}")
+                                                st.write(doc['contenido'][:1500] + "...")
+                                                st.button("Copiar Cita Técnica", key=f"cite_{doc['id']}")
+                                    else:
+                                        st.warning("No se hallaron documentos con relevancia suficiente.")
                                 else:
-                                    st.warning("No se encontraron coincidencias relevantes con esos filtros.")
-                            else:
-                                st.warning("La base de datos no tiene documentos que coincidan con el filtro inicial.")
+                                    st.warning("No hay documentos cargados en la base de datos con estos criterios.")
+                        except Exception as e:
+                            st.error(f"Error en el motor RAG: {e}")
+
+        # --- OPCIÓN 2: ANALIZAR MI ESCRITO (LABORATORIO REAL) ---
+        elif modo_biblio == "📄 Analizar mi Escrito":
+            st.info("💡 Sube tu borrador para detectar debilidades procesales y recibir sugerencias de párrafos jurídicos.")
+            borrador = st.file_uploader("Sube tu borrador (PDF, Word o Txt)", type=["pdf", "docx", "txt"], key="uploader_borrador_biblio")
+            
+            if borrador and st.button("⚖️ Ejecutar Análisis de Estrategia", use_container_width=True):
+                with st.spinner("Analizando consistencia jurídica del escrito..."):
+                    try:
+                        texto_borrador = extraer_texto_generico(borrador)
+                        if texto_borrador:
+                            prompt_analisis = """
+                            Actúa como Abogado Senior y Profesor de Derecho Procesal. Analiza el borrador adjunto.
+                            TU OBJETIVO:
+                            1. DETECTAR DEBILIDADES: Indica qué argumentos son débiles o carecen de sustento legal.
+                            2. REDACTAR MEJORAS: Proporciona párrafos jurídicos listos para copiar y pegar que refuercen el escrito.
+                            3. JURISPRUDENCIA: Indica qué tipo de fallos debe buscar el abogado para este caso específico.
+                            """
+                            resultado = process_legal_query(prompt_analisis, texto_borrador)
+                            
+                            st.markdown("---")
+                            st.subheader("🚩 Informe de Mejora Técnica")
+                            st.markdown(resultado)
                         else:
-                            st.error("Error generando vector de búsqueda.")
-
+                            st.error("No se pudo extraer texto del documento.")
                     except Exception as e:
-                        st.error(f"Error en motor de búsqueda: {e}")
+                        st.error(f"Error analizando borrador: {e}")
 
-        else: # Analizar mi Escrito (MEJORADO: SUGERENCIAS DIRECTAS)
-            st.info("Sube tu borrador. La IA detectará debilidades y sugerirá argumentos de derecho sólidos.")
-            borrador = st.file_uploader("Sube tu borrador (PDF/Word/Txt)", type=["pdf","docx","txt"])
+        # --- OPCIÓN 3: ESTRATEGIA GLOBAL (MASTER RPA - CONVERSA CON EL CASO) ---
+        elif modo_biblio == "🧠 Estrategia Global (Master RPA)":
+            st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
+            st.info("Este motor analiza la TOTALIDAD del texto extraído de la evidencia cargada en la sesión (Analista Multimodal o Admin).")
+            
+            # Verificación de texto acumulado en la sesión
+            texto_maestro = st.session_state.get('all_text', "").strip()
+            
+            if not texto_maestro:
+                st.warning("⚠️ Memoria vacía. Primero carga y analiza documentos en la pestaña 'Analista Multimodal' para alimentar este cerebro.")
+            else:
+                st.success(f"✅ Memoria activa detectada: {len(texto_maestro)} caracteres listos para análisis estratégico.")
+                
+                if st.button("🚀 GENERAR ESTRATEGIA GLOBAL DEL CASO", use_container_width=True):
+                    with st.spinner("Cruzando información de todos los documentos y audios analizados..."):
+                        try:
+                            prompt_master = """
+                            Actúa como Jefe de Defensores. Tienes acceso a toda la evidencia del caso (Partes, Audios, Escritos).
+                            REALIZA UN ANÁLISIS MAESTRO:
+                            1. CRONOLOGÍA DE HECHOS: Establece la línea de tiempo real vs la versión policial.
+                            2. CONTRADICCIONES CRÍTICAS: Identifica dónde se contradice la fiscalía o sus pruebas.
+                            3. TEORÍA DEL CASO: Sugiere la narrativa de defensa más sólida.
+                            4. PROGNOSIS: Evalúa riesgo de condena y conveniencia de salidas alternativas.
+                            """
+                            informe_maestro = process_legal_query(prompt_master, texto_maestro)
+                            
+                            st.markdown("---")
+                            st.markdown("#### 🧠 Informe Maestro de Estrategia RPA")
+                            st.markdown(informe_maestro)
+                            
+                            if 'logs' not in st.session_state: st.session_state.logs = []
+                            st.session_state.logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Análisis Maestro de Causa ejecutado.")
+                            
+                        except Exception as e:
+                            st.error(f"Error en el motor Maestro: {e}")
             
            # --- ANÁLISIS REAL DE ESTRATEGIA JURÍDICA ---
             st.info("💡 Análisis estratégico real mediante LangChain y Gemini 1.5 Pro.")
