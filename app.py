@@ -1312,10 +1312,12 @@ def main_app():
             key="contexto_analista_principal"
         )
 
+ # --- LÓGICA DE PROCESAMIENTO (REESCRITA CON CALCULADORA JURÍDICA) ---
         if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA", use_container_width=True):
             status_box = st.empty()
-            with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
+            with st.spinner("Procesando evidencia multimodal (Vision IA & Legal Logic)..."):
                 try:
+                    # 1. Preparación del modelo y carga de archivos
                     model_analista = get_generative_model_dinamico()
                     docs_para_gemini = []
                     
@@ -1334,56 +1336,84 @@ def main_app():
                         docs_para_gemini.append(f_gemini)
                         os.remove(tmp_path)
 
-                    status_box.info("🧠 Generando estrategia jurídica integral...")
+                    status_box.info("🧠 Ejecutando análisis técnico y cálculo de penas...")
 
+                    # 2. PROMPT REFORZADO: CALCULADORA JURÍDICA INTEGRADA
                     prompt_system = """
-                    Eres un Estratega de Defensa Penal Senior.
-                    IMPORTANTE: Tu respuesta es para un abogado. NO incluyas código python, ni json raw, ni expliques que eres una IA.
-                    Solo entrega el informe jurídico profesional estructurado.
+                    Eres un Estratega de Defensa Penal Senior y Experto en Determinación de Penas en Chile.
+                    
+                    TU PRIMERA TAREA: Identificar mediante el texto si el caso se rige por la Ley 20.084 (RPA) o Código Penal (Adulto).
+                    
+                    REGLAS IMPERATIVAS DE CÁLCULO:
+                    - RÉGIMEN RPA: Aplica SIEMPRE la rebaja de un grado (Art. 21) al marco penal del adulto. Considera el límite máximo de 5 o 10 años.
+                    - RÉGIMEN ADULTO: Aplica reglas de los Art. 65 a 69 del Código Penal.
+                    - MODIFICATORIAS: Analiza Atenuantes (11 N°6, 11 N°9) y Agravantes. Determina su impacto matemático en el tramo de la pena.
                     """
 
                     if "Control de Detención" in objetivo_analisis:
                         prompt_especifico = """
                         TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
-                        Analiza contradicciones en partes policiales, vulneración de derechos o falta de indicios del Art. 85 CPP.
-                        Genera también un RECUADRO DE RESUMEN al final llamado 'RESUMEN ESTRATÉGICO' con:
+                        Analiza: Art. 85 CPP (Indicios), lectura de derechos y coherencia del relato policial.
+                        
+                        AL FINAL, GENERA UN BLOQUE LLAMADO 'RESUMEN ESTRATÉGICO' CON:
                         - Ilegalidad detectada: (Sí/No)
                         - Probabilidad de éxito: (Alta/Media/Baja)
                         - Argumento clave.
                         """
                     else:
                         prompt_especifico = """
-                        TU MISIÓN: Construir una Estrategia de Defensa Integral.
+                        TU MISIÓN: Construir una Estrategia de Defensa Integral y Teoría del Caso.
+                        1. ANÁLISIS DE PRUEBA: Debilidades fácticas.
+                        2. TEORÍA DEL CASO: Propuesta de defensa (Nuestra versión).
+                        3. PROGNOSIS DE PENA:
+                           - Régimen identificado (RPA o Adulto).
+                           - Marco penal base y cálculo final tras aplicar modificatorias y reglas de grado.
+                        
                         AL FINAL, GENERA UN BLOQUE LLAMADO 'RESUMEN ESTRATÉGICO' CON:
-                        - Pena Probable, Pena Sustitutiva, Atenuantes, Agravantes, Salida Alternativa y Recomendación.
+                        - Régimen: [RPA / Adulto]
+                        - Pena Probable: (Ej: 541 días o Semicerrado 3 años)
+                        - Pena Sustitutiva: (Viabilidad Ley 18.216 o Sanciones Ley 20.084)
+                        - Recomendación: (Juicio, Abreviado o Salida Alternativa)
                         """
 
                     prompt_final = [prompt_system + prompt_especifico, f"Contexto adicional: {contexto_usuario}"]
                     prompt_final.extend(docs_para_gemini)
 
+                    # 3. Generación de contenido y captura segura
                     response = model_analista.generate_content(prompt_final)
                     texto_resultado = safe_get_text(response)
                     
                     # --- ALIMENTAR MEMORIA MAESTRA ---
                     if 'all_text' not in st.session_state: st.session_state.all_text = ""
-                    st.session_state.all_text += f"\n--- ANÁLISIS {datetime.now()} ---\n{texto_resultado}"
+                    st.session_state.all_text += f"\n--- ANÁLISIS JURÍDICO {datetime.now().strftime('%Y-%m-%d %H:%M')} ---\n{texto_resultado}\n"
                     
-                    status_box.success("✅ Análisis Completado")
+                    status_box.success("✅ Análisis y Cálculo Completado")
                     st.markdown("---")
 
+                    # 4. VISUALIZACIÓN INTELIGENTE (Split de Resumen)
                     if "RESUMEN ESTRATÉGICO" in texto_resultado:
                         partes = texto_resultado.split("RESUMEN ESTRATÉGICO")
                         resumen_texto = partes[-1]
                         contenido_principal = partes[0]
-                        st.markdown(f"<div class='resumen-dinamico'><h4>📊 RESUMEN ESTRATÉGICO</h4>{resumen_texto}</div>", unsafe_allow_html=True)
+                        st.markdown(f"""
+                            <div class='resumen-dinamico'>
+                                <h4 style='margin-top:0; color:#161B2F;'>📊 RESUMEN ESTRATÉGICO & PROGNOSIS</h4>
+                                {resumen_texto}
+                            </div>
+                        """, unsafe_allow_html=True)
                         st.markdown(contenido_principal)
                     else:
                         st.markdown(texto_resultado)
                     
-                    st.download_button("📥 Descargar Informe", texto_resultado, f"Analisis_{archivo.name}.txt")
+                    st.download_button(
+                        "📥 Descargar Informe de Estrategia", 
+                        texto_resultado, 
+                        f"Analisis_Estrategico_{datetime.now().strftime('%H%M')}.txt",
+                        use_container_width=True
+                    )
 
                 except Exception as e:
-                    st.error(f"Error en el análisis multimodal: {e}")
+                    st.error(f"Error durante el procesamiento multimodal: {e}")
 
  # =============================================================================
     # === TAB 3: TRANSCRIPTOR FORENSE & ESTRATEGA DE AUDIENCIA (FULL LITERAL) ===
