@@ -107,6 +107,33 @@ def process_legal_query(user_question, context_data):
         return response
     except Exception as e:
         return f"Error durante el procesamiento: {str(e)}"
+        # --- FUNCIONES DE EXTRACCIÓN DE TEXTO ---
+
+def extraer_texto_pdf(file):
+    """Extrae texto de un archivo PDF."""
+    reader = PyPDF2.PdfReader(file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() + "\n"
+    return text
+
+def extraer_texto_docx(file):
+    """Extrae texto de un archivo Word."""
+    doc = Document(file)
+    return "\n".join([para.text for para in doc.paragraphs])
+
+def extraer_texto_generico(uploaded_file):
+    """Detecta el tipo de archivo y extrae el texto de forma automática."""
+    if uploaded_file is None: return ""
+    try:
+        if uploaded_file.name.lower().endswith('.pdf'):
+            return extraer_texto_pdf(uploaded_file)
+        elif uploaded_file.name.lower().endswith(('.docx', '.doc')):
+            return extraer_texto_docx(uploaded_file)
+        return ""
+    except Exception as e:
+        st.error(f"Error extrayendo texto de {uploaded_file.name}: {e}")
+        return ""
 # ... (Continúa con tu código de configuración y CSS)
 
 # =============================================================================
