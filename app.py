@@ -1498,10 +1498,10 @@ def main_app():
     with tabs[3]:
         st.header("📚 Biblioteca Jurídica Inteligente & Cerebro Estratégico")
         
-        # Selector de Herramienta en la Biblioteca
+      # Selector de Herramienta en la Biblioteca
         modo_biblio = st.radio(
-            "Selecciona Herramienta de Investigación:", 
-            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito"
+            "Selecciona Herramienta de Investigación:",
+            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito"],
             horizontal=True,
             key="selector_biblioteca_maestra"
         )
