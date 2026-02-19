@@ -1501,7 +1501,7 @@ def main_app():
         # Selector de Herramienta en la Biblioteca
         modo_biblio = st.radio(
             "Selecciona Herramienta de Investigación:", 
-            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito",
+            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito"
             horizontal=True,
             key="selector_biblioteca_maestra"
         )
