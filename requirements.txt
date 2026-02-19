@@ -1,1 +1,29 @@
---- NÚCLEO Y FRAMEWORK ---streamlitpandaswatchdog--- INTELIGENCIA ARTIFICIAL Y LÓGICA ---google-generativeai>=0.7.0langchainlangchain-community--- PROCESAMIENTO DE DOCUMENTOS Y ARCHIVOS ---python-docxPyPDF2Pillow--- AUDIO Y VOZ ---librosasoundfilepydubSpeechRecognition--- BASE DE DATOS Y SEGURIDAD ---supabase--- DISEÑO Y UX PREMIUM ---streamlit-option-menustreamlit-antd-componentsstreamlit-shadcn-uistreamlit-extras
+# NÚCLEO Y FRAMEWORK
+streamlit
+pandas
+watchdog
+
+# INTELIGENCIA ARTIFICIAL Y LÓGICA
+google-generativeai>=0.7.0
+langchain
+langchain-community
+
+# PROCESAMIENTO DE DOCUMENTOS Y ARCHIVOS
+python-docx
+PyPDF2
+Pillow
+
+# AUDIO Y VOZ
+librosa
+soundfile
+pydub
+SpeechRecognition
+
+# BASE DE DATOS Y SEGURIDAD
+supabase
+
+# DISEÑO Y UX PREMIUM
+streamlit-option-menu
+streamlit-antd-components
+streamlit-shadcn-ui
+streamlit-extras
