@@ -1327,10 +1327,18 @@ def main_app():
                     
                     status_box.success("✅ Análisis Completado")
                     
-                    texto_resultado = response.text
+               # Si tenías lógica residual aquí, nos aseguramos de cerrar el bloque try
+                        # Para el Panel RPA, esto debería ser el final del éxito:
+                        st.session_state.logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Operación completada.")
+                        st.success("✅ Procesamiento finalizado con éxito.")
 
-        
+                    # === CIERRE OBLIGATORIO DEL BLOQUE TRY (CORRECCIÓN ERROR) ===
+                    except Exception as e:
+                        st.error(f"Error durante el procesamiento: {e}")
+
+    # -----------------------------------------------------------------------------
     # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
+    # -----------------------------------------------------------------------------
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
         st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
