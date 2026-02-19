@@ -1238,7 +1238,6 @@ def main_app():
                 else:
                     with st.spinner("⚖️ Analizando documentos con Inteligencia Artificial..."):
                         try:
-                            try:
                         # 1. Definimos la consulta
                         query_rpa = """
                         Realiza un análisis jurídico profundo de los documentos proporcionados.
