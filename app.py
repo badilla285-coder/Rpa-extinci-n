@@ -15,8 +15,6 @@ import random
 import tempfile
 import os
 import numpy as np # Importante para los vectores
-# ... (Tus imports existentes hasta numpy)
-import numpy as np
 
 # === NUEVOS IMPORTS LANGCHAIN (ESTRUCTURA ROBUSTA) ===
 try:
@@ -31,7 +29,10 @@ except ImportError:
     from langchain.schema.output_parser import StrOutputParser
     from langchain.schema.runnable import RunnablePassthrough
 
-# Configuración de LangChain con Gemini
+# =============================================================================
+# CONFIGURACIÓN DE IA (LANGCHAIN & GEMINI) - CORRECCIÓN 404 & SEGURIDAD
+# =============================================================================
+
 def get_langchain_model():
     """Retorna una instancia de ChatGoogleGenerativeAI configurada."""
     try:
@@ -41,18 +42,30 @@ def get_langchain_model():
             return None
             
         api_key = st.secrets["GOOGLE_API_KEY"]
+        
+        # Configuración de seguridad para evitar censura en temas penales (Fix finish_reason 1)
+        # Esto permite procesar términos como "homicidio", "violencia", etc., sin bloqueos.
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
+
         llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash", 
             temperature=0.3, # Precisión legal mantenida
             google_api_key=api_key,
             # Esta opción ayuda a la compatibilidad con modelos antiguos si fuera necesario
-            convert_system_message_to_human=True 
+            convert_system_message_to_human=True,
+            safety_settings=safety_settings
         )
         return llm
     except Exception as e:
         st.error(f"Error iniciando LangChain: {e}")
         return None
-        # === CONFIGURACIÓN DE PROMPT TEMPLATE (ESTÁNDAR JURÍDICO) ===
+
+# === CONFIGURACIÓN DE PROMPT TEMPLATE (ESTÁNDAR JURÍDICO) ===
 
 def get_legal_prompt_template():
     """
@@ -108,20 +121,31 @@ def process_legal_query(user_question, context_data):
         return response
     except Exception as e:
         return f"Error durante el procesamiento: {str(e)}"
-        # --- FUNCIONES DE EXTRACCIÓN DE TEXTO ---
+
+# === FUNCIONES DE EXTRACCIÓN DE TEXTO ===
 
 def extraer_texto_pdf(file):
     """Extrae texto de un archivo PDF."""
-    reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text() + "\n"
-    return text
+    try:
+        reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            content = page.extract_text()
+            if content:
+                text += content + "\n"
+        return text
+    except Exception as e:
+        st.error(f"Error leyendo PDF: {e}")
+        return ""
 
 def extraer_texto_docx(file):
     """Extrae texto de un archivo Word."""
-    doc = Document(file)
-    return "\n".join([para.text for para in doc.paragraphs])
+    try:
+        doc = Document(file)
+        return "\n".join([para.text for para in doc.paragraphs])
+    except Exception as e:
+        st.error(f"Error leyendo Word: {e}")
+        return ""
 
 def extraer_texto_generico(uploaded_file):
     """Detecta el tipo de archivo y extrae el texto de forma automática."""
@@ -135,8 +159,6 @@ def extraer_texto_generico(uploaded_file):
     except Exception as e:
         st.error(f"Error extrayendo texto de {uploaded_file.name}: {e}")
         return ""
-# ... (Continúa con tu código de configuración y CSS)
-
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
 # =============================================================================
