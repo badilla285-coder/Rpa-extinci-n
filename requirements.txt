@@ -5,9 +5,10 @@ watchdog
 
 # INTELIGENCIA ARTIFICIAL Y LÓGICA
 google-generativeai>=0.7.0
-langchain
-langchain-community
-langchain-google-genai    # <--- AGREGA ESTA LÍNEA
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-google-genai>=1.0.0
+langchain-core
 
 # PROCESAMIENTO DE DOCUMENTOS Y ARCHIVOS
 python-docx
