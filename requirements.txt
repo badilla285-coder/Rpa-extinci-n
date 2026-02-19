@@ -1,18 +1,29 @@
+# --- NÚCLEO Y FRAMEWORK ---
 streamlit
+pandas
+watchdog
+
+# --- INTELIGENCIA ARTIFICIAL Y LÓGICA ---
+google-generativeai>=0.7.0
+langchain
+langchain-community
+
+# --- PROCESAMIENTO DE DOCUMENTOS Y ARCHIVOS ---
 python-docx
 PyPDF2
-supabase
-google-generativeai>=0.7.0
-SpeechRecognition
-pydub
-pandas
 Pillow
+
+# --- AUDIO Y VOZ ---
 librosa
 soundfile
-watchdog
-streamlit-option-menu
+pydub
+SpeechRecognition
 
-# --- LIBRERÍAS DE DISEÑO PREMIUM (AGREGADAS) ---
+# --- BASE DE DATOS Y SEGURIDAD ---
+supabase
+
+# --- DISEÑO Y UX PREMIUM ---
+streamlit-option-menu
 streamlit-antd-components
 streamlit-shadcn-ui
 streamlit-extras
