@@ -1492,7 +1492,7 @@ def main_app():
         else:
             st.warning("⚠️ Esperando archivo de audio para iniciar el análisis.")
 
- # =============================================================================
+# =============================================================================
     # === TAB 4: BIBLIOTECA JURÍDICA INTELIGENTE & ANÁLISIS MAESTRO (RAG + RPA) ===
     # =============================================================================
     with tabs[3]:
@@ -1525,7 +1525,7 @@ def main_app():
                     with st.spinner("Consultando bases de datos y generando respuesta estratégica..."):
                         try:
                             # 1. Obtener Embedding de la consulta
-                            modelo_emb = get_embedding_model()
+                            modelo_emb = get_embedding_model() # Función definida previamente
                             emb_resp = genai.embed_content(
                                 model=modelo_emb,
                                 content=query_busqueda,
@@ -1548,7 +1548,6 @@ def main_app():
                                         if isinstance(vec_doc, str):
                                             vec_doc = json.loads(vec_doc)
                                         
-                                        # Metadatos
                                         meta = doc['metadata']
                                         if isinstance(meta, str): meta = json.loads(meta)
                                         
@@ -1585,7 +1584,7 @@ def main_app():
                                         
                                         model_resp = get_generative_model_dinamico()
                                         resp_ia = model_resp.generate_content(prompt_rag)
-                                        texto_juridico = safe_get_text(resp_ia)
+                                        texto_juridico = safe_get_text(resp_ia) # Función de seguridad definida previamente
                                         
                                         st.markdown("<div class='resumen-dinamico'><h4>⚖️ RESPUESTA JURÍDICA INTELIGENTE</h4>" + texto_juridico + "</div>", unsafe_allow_html=True)
                                         
@@ -1607,62 +1606,77 @@ def main_app():
         # --- OPCIÓN 2: ANALIZAR MI ESCRITO (LABORATORIO REAL) ---
         elif modo_biblio == "📄 Analizar mi Escrito":
             st.info("💡 Sube tu borrador para detectar debilidades procesales y recibir sugerencias de párrafos jurídicos.")
-            borrador = st.file_uploader("Sube tu borrador (PDF, Word o Txt)", type=["pdf", "docx", "txt"], key="uploader_borrador_biblio")
             
-            if borrador and st.button("⚖️ Ejecutar Análisis de Estrategia", use_container_width=True):
-                with st.spinner("Analizando consistencia jurídica del escrito..."):
-                    try:
-                        texto_borrador = extraer_texto_generico(borrador)
-                        if texto_borrador:
-                            prompt_analisis = """
-                            Actúa como Abogado Senior y Profesor de Derecho Procesal. Analiza el borrador adjunto.
-                            TU OBJETIVO:
-                            1. DETECTAR DEBILIDADES: Indica qué argumentos son débiles o carecen de sustento legal.
-                            2. REDACTAR MEJORAS: Proporciona párrafos jurídicos listos para copiar y pegar que refuercen el escrito.
-                            3. JURISPRUDENCIA: Indica qué tipo de fallos debe buscar el abogado para este caso específico.
-                            """
-                            resultado = process_legal_query(prompt_analisis, texto_borrador)
+            # Cambiamos el nombre de la variable para evitar colisiones
+            borrador_doc = st.file_uploader("Sube tu borrador (PDF, Word o Txt)", type=["pdf", "docx", "txt"], key="uploader_borrador_lab")
+            
+            if borrador_doc is not None:
+                if st.button("⚖️ Ejecutar Análisis de Estrategia", use_container_width=True):
+                    with st.spinner("Analizando consistencia jurídica del escrito..."):
+                        try:
+                            # Extraemos texto usando la función genérica ya definida
+                            texto_borrador = extraer_texto_generico(borrador_doc)
                             
-                            st.markdown("---")
-                            st.subheader("🚩 Informe de Mejora Técnica")
-                            st.markdown(resultado)
-                        else:
-                            st.error("No se pudo extraer texto del documento.")
-                    except Exception as e:
-                        st.error(f"Error analizando borrador: {e}")
+                            if texto_borrador:
+                                prompt_analisis = """
+                                Actúa como Abogado Senior y Profesor de Derecho Procesal. Analiza el borrador adjunto.
+                                TU OBJETIVO:
+                                1. DETECTAR DEBILIDADES: Indica qué argumentos son débiles o carecen de sustento legal.
+                                2. REDACTAR MEJORAS: Proporciona párrafos jurídicos listos para copiar y pegar que refuercen el escrito.
+                                3. JURISPRUDENCIA: Indica qué tipo de fallos debe buscar el abogado para este caso específico.
+                                """
+                                # Llamada a la función de procesamiento LangChain
+                                resultado_escrito = process_legal_query(prompt_analisis, texto_borrador)
+                                
+                                st.markdown("---")
+                                st.subheader("🚩 Informe de Mejora Técnica")
+                                st.markdown(resultado_escrito)
+                                
+                                if 'logs' in st.session_state:
+                                    st.session_state.logs.append(f"Análisis de borrador '{borrador_doc.name}' completado.")
+                            else:
+                                st.error("No se pudo extraer texto del documento subido.")
+                        except Exception as e:
+                            st.error(f"Error analizando borrador: {e}")
+            else:
+                st.warning("Carga un archivo para iniciar el análisis estratégico.")
 
         # --- OPCIÓN 3: ESTRATEGIA GLOBAL (MASTER RPA - CONVERSA CON EL CASO) ---
         elif modo_biblio == "🧠 Estrategia Global (Master RPA)":
-            st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
+            st.markdown("### 🤖 Procesamiento Inteligente de la Causa (Master RPA)")
             st.info("Este motor analiza la TOTALIDAD del texto extraído de la evidencia cargada en la sesión (Analista Multimodal o Admin).")
             
-            # Verificación de texto acumulado en la sesión
+            # Recuperamos el texto acumulado
             texto_maestro = st.session_state.get('all_text', "").strip()
             
             if not texto_maestro:
-                st.warning("⚠️ Memoria vacía. Primero carga y analiza documentos en la pestaña 'Analista Multimodal' para alimentar este cerebro.")
+                st.warning("⚠️ Memoria vacía. Primero carga y analiza documentos en la pestaña 'Analista Multimodal' o 'Transcriptor' para alimentar este cerebro.")
             else:
-                st.success(f"✅ Memoria activa detectada: {len(texto_maestro)} caracteres listos para análisis estratégico.")
+                st.success(f"✅ Memoria activa detectada: {len(texto_maestro)} caracteres listos para análisis estratégico integral.")
                 
                 if st.button("🚀 GENERAR ESTRATEGIA GLOBAL DEL CASO", use_container_width=True):
-                    with st.spinner("Cruzando información de todos los documentos y audios analizados..."):
+                    with st.spinner("Cruzando información de todos los documentos y audios analizados en la sesión..."):
                         try:
                             prompt_master = """
-                            Actúa como Jefe de Defensores. Tienes acceso a toda la evidencia del caso (Partes, Audios, Escritos).
-                            REALIZA UN ANÁLISIS MAESTRO:
-                            1. CRONOLOGÍA DE HECHOS: Establece la línea de tiempo real vs la versión policial.
-                            2. CONTRADICCIONES CRÍTICAS: Identifica dónde se contradice la fiscalía o sus pruebas.
+                            Actúa como Jefe de Defensores Penalistas. Tienes acceso a toda la evidencia del caso acumulada hoy.
+                            REALIZA UN ANÁLISIS MAESTRO INTEGRAL:
+                            1. CRONOLOGÍA DE HECHOS: Establece la línea de tiempo real basada en todos los antecedentes.
+                            2. CONTRADICCIONES CRÍTICAS: Identifica dónde se contradice la fiscalía, testigos o el parte policial comparando diferentes fuentes.
                             3. TEORÍA DEL CASO: Sugiere la narrativa de defensa más sólida.
-                            4. PROGNOSIS: Evalúa riesgo de condena y conveniencia de salidas alternativas.
+                            4. PROGNOSIS Y SALIDAS: Evalúa riesgo de condena y conveniencia de salidas alternativas (SCP o AR).
                             """
+                            # Llamada a la IA para análisis de toda la sesión
                             informe_maestro = process_legal_query(prompt_master, texto_maestro)
                             
                             st.markdown("---")
                             st.markdown("#### 🧠 Informe Maestro de Estrategia RPA")
                             st.markdown(informe_maestro)
                             
-                            if 'logs' not in st.session_state: st.session_state.logs = []
-                            st.session_state.logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Análisis Maestro de Causa ejecutado.")
+                            if 'logs' in st.session_state:
+                                timestamp_rpa = datetime.now().strftime('%H:%M:%S')
+                                st.session_state.logs.append(f"[{timestamp_rpa}] Análisis Maestro RPA de la causa ejecutado.")
+                            
+                            st.success("✅ Estrategia global generada exitosamente.")
                             
                         except Exception as e:
                             st.error(f"Error en el motor Maestro: {e}")
