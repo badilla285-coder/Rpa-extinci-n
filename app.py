@@ -37,7 +37,7 @@ except ImportError:
 def get_langchain_model():
     """Retorna una instancia de ChatGoogleGenerativeAI configurada dinámicamente."""
     try:
-        # Verificamos si la API KEY existe en secrets
+        # Verificamos si la API KEY existe en secrets para evitar errores mudos
         if "GOOGLE_API_KEY" not in st.secrets:
             st.error("Falta la configuración de GOOGLE_API_KEY en los Secrets de Streamlit.")
             return None
@@ -52,37 +52,47 @@ def get_langchain_model():
             "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
         }
 
-        # 2. SELECCIÓN DINÁMICA DE MODELO
-        # Definimos el estándar actual como fallback principal para evitar 'gemini-pro' (404)
-        nombre_modelo = "gemini-1.5-flash" 
+        # 2. SELECCIÓN DINÁMICA DE MODELO (MODO SUPERVIVENCIA)
+        # Por defecto usamos un fallback muy conservador si la detección falla
+        nombre_modelo = "gemini-pro" 
         
         try:
             genai.configure(api_key=api_key)
-            # Obtenemos lista limpia de modelos (sin el prefijo 'models/')
-            # Filtramos solo los que soportan 'generateContent'
+            # Obtenemos lista real de modelos disponibles para tu API Key
             modelos_raw = genai.list_models()
-            modelos_disponibles = [m.name.replace("models/", "") for m in modelos_raw if 'generateContent' in m.supported_generation_methods]
             
-            # Lógica de prioridad explícita
-            if "gemini-1.5-flash" in modelos_disponibles:
+            # Filtramos y limpiamos nombres (quitamos el prefijo 'models/')
+            disponibles = []
+            for m in modelos_raw:
+                if 'generateContent' in m.supported_generation_methods:
+                    name_clean = m.name.replace("models/", "")
+                    disponibles.append(name_clean)
+            
+            # Lógica de prioridad: Intentamos encontrar el mejor modelo disponible en TU lista
+            if "gemini-1.5-flash" in disponibles:
                 nombre_modelo = "gemini-1.5-flash"
-            elif "gemini-1.5-flash-001" in modelos_disponibles:
+            elif "gemini-1.5-flash-latest" in disponibles:
+                nombre_modelo = "gemini-1.5-flash-latest"
+            elif "gemini-1.5-flash-001" in disponibles:
                 nombre_modelo = "gemini-1.5-flash-001"
-            elif "gemini-1.5-pro" in modelos_disponibles:
+            elif "gemini-1.5-pro" in disponibles:
                 nombre_modelo = "gemini-1.5-pro"
-            elif "gemini-1.0-pro" in modelos_disponibles:
+            elif "gemini-1.0-pro" in disponibles:
                 nombre_modelo = "gemini-1.0-pro"
-                
+            
+            # Debug (Opcional: puedes descomentar si quieres ver qué modelo eligió)
+            # st.write(f"Modelo seleccionado: {nombre_modelo}")
+
         except Exception as e:
-            # Si falla la conexión a list_models, usamos el fallback "gemini-1.5-flash" silenciosamente
-            # st.warning(f"Usando modelo por defecto tras error de lista: {e}") 
+            # Si falla la conexión a list_models, mantenemos el fallback "gemini-pro"
             pass
 
-        # 3. Inicialización
+        # 3. Inicialización del Chat
         llm = ChatGoogleGenerativeAI(
             model=nombre_modelo, 
-            temperature=0.3,
+            temperature=0.3, # Precisión legal mantenida
             google_api_key=api_key,
+            # Esta opción ayuda a la compatibilidad con modelos antiguos si fuera necesario
             convert_system_message_to_human=True,
             safety_settings=safety_settings
         )
