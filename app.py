@@ -33,9 +33,9 @@ except ImportError:
 # CONFIGURACIÓN DE IA (LANGCHAIN & GEMINI) - CORRECCIÓN 404 & SEGURIDAD
 # =============================================================================
 
-# Configuración de LangChain con Gemini
+# Configuración de LangChain con Gemini (SOLUCIÓN DEFINITIVA 404)
 def get_langchain_model():
-    """Retorna una instancia de ChatGoogleGenerativeAI configurada."""
+    """Retorna una instancia de ChatGoogleGenerativeAI configurada dinámicamente."""
     try:
         # Verificamos si la API KEY existe en secrets
         if "GOOGLE_API_KEY" not in st.secrets:
@@ -44,7 +44,7 @@ def get_langchain_model():
             
         api_key = st.secrets["GOOGLE_API_KEY"]
         
-        # 1. SEGURIDAD: Usamos Strings para evitar el error de validación anterior
+        # 1. Configuración de Seguridad (Strings para evitar error Pydantic)
         safety_settings = {
             "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
             "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
@@ -52,10 +52,34 @@ def get_langchain_model():
             "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
         }
 
-        # 2. MODELO: Usamos la versión explícita '001' para evitar el error 404 NOT FOUND
-        # Si 'gemini-1.5-flash' falla, 'gemini-1.5-flash-001' suele ser la ruta estable.
+        # 2. SELECCIÓN DINÁMICA DE MODELO
+        # Consultamos a Google qué modelos tiene la cuenta para evitar '404 Not Found'
+        nombre_modelo = "gemini-pro" # Fallback seguro (modelo legacy estable)
+        
+        try:
+            genai.configure(api_key=api_key)
+            # Obtenemos lista real de modelos disponibles
+            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            
+            # Buscamos 'gemini-1.5-flash' (cualquier versión: 001, 002, latest, etc.)
+            flash = next((m for m in modelos_disponibles if 'gemini-1.5-flash' in m), None)
+            
+            # Buscamos 'gemini-1.5-pro' si no hay flash
+            pro = next((m for m in modelos_disponibles if 'gemini-1.5-pro' in m), None)
+            
+            if flash: 
+                # LangChain a veces prefiere el nombre sin el prefijo 'models/'
+                nombre_modelo = flash.replace("models/", "") 
+            elif pro: 
+                nombre_modelo = pro.replace("models/", "")
+                
+        except Exception:
+            # Si falla la conexión previa, intentamos con el último conocido
+            pass
+
+        # 3. Inicialización
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash-001", 
+            model=nombre_modelo, 
             temperature=0.3,
             google_api_key=api_key,
             convert_system_message_to_human=True,
