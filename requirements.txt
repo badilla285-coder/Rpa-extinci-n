@@ -2,7 +2,7 @@ streamlit
 python-docx
 PyPDF2
 supabase
-google-generativeai
+google-generativeai>=0.7.0
 SpeechRecognition
 pydub
 pandas
@@ -10,5 +10,9 @@ Pillow
 librosa
 soundfile
 watchdog
-google-generativeai>=0.7.0
 streamlit-option-menu
+
+# --- LIBRERÍAS DE DISEÑO PREMIUM (AGREGADAS) ---
+streamlit-antd-components
+streamlit-shadcn-ui
+streamlit-extras
