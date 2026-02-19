@@ -1304,9 +1304,6 @@ def main_app():
                             # Manejo de errores específicos del motor de IA
                             st.error(f"Error crítico en el motor de IA: {e}")
 
-    # =============================================================================
-    # TAB 2: ANALISTA MULTIMODAL
-    # =============================================================================
 # =============================================================================
     # === TAB 2: ANALISTA MULTIMODAL (VISION & STRATEGY) ===
     # =============================================================================
@@ -1319,30 +1316,28 @@ def main_app():
             ["📄 Control de Detención (Busca ilegalidades)", 
              "⚖️ Estrategia Integral (Teoría del Caso, Salidas & Prognosis)"],
             horizontal=True,
-            key="radio_objetivo"
+            key="radio_objetivo_principal"
         )
 
         archivos_evidencia = st.file_uploader(
             "Cargar Evidencia (PDF, JPG, PNG, TXT)", 
             type=["pdf", "jpg", "png", "txt", "jpeg"], 
             accept_multiple_files=True,
-            key="uploader_evidencia"
+            key="uploader_evidencia_principal"
         )
 
         contexto_usuario = st.text_area(
             "Contexto adicional (Ej: 'El cliente dice que Carabineros mintió...')",
-            key="contexto_analista"
+            key="contexto_analista_principal"
         )
 
         if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA", use_container_width=True):
             status_box = st.empty()
             with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
                 try:
-                    # Inicializamos el modelo con configuración de seguridad
                     model_analista = get_generative_model_dinamico()
                     docs_para_gemini = []
                     
-                    # Proceso de subida de archivos a la API de Gemini
                     for archivo in archivos_evidencia:
                         status_box.info(f"Subiendo a Gemini Vision: {archivo.name}...")
                         suffix = f".{archivo.name.split('.')[-1]}"
@@ -1351,7 +1346,6 @@ def main_app():
                             tmp_path = tmp.name
 
                         f_gemini = genai.upload_file(tmp_path)
-                        # Esperamos a que el archivo sea procesado por los servidores de Google
                         while f_gemini.state.name == "PROCESSING":
                             time.sleep(1)
                             f_gemini = genai.get_file(f_gemini.name)
@@ -1371,7 +1365,7 @@ def main_app():
                         prompt_especifico = """
                         TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
                         Analiza contradicciones en partes policiales, vulneración de derechos o falta de indicios del Art. 85 CPP.
-                        Genera también un RECUADRO DE RESUMEN al final con:
+                        Genera también un RECUADRO DE RESUMEN al final llamado 'RESUMEN ESTRATÉGICO' con:
                         - Ilegalidad detectada: (Sí/No)
                         - Probabilidad de éxito: (Alta/Media/Baja)
                         - Argumento clave.
@@ -1379,153 +1373,23 @@ def main_app():
                     else:
                         prompt_especifico = """
                         TU MISIÓN: Construir una Estrategia de Defensa Integral.
-                        
-                        ESTRUCTURA OBLIGATORIA DEL INFORME:
-                        1. ANÁLISIS DE LA PRUEBA (Debilidades fiscalía).
-                        2. TEORÍA DEL CASO (Nuestra versión).
-                        
-                        AL FINAL, GENERA UN BLOQUE LLAMADO "RESUMEN ESTRATÉGICO" CON:
-                        - Pena Probable: (Ej: 541 días)
-                        - Pena Sustitutiva: (Ej: Remisión Condicional)
-                        - Atenuantes: (Lista)
-                        - Agravantes: (Lista)
-                        - Salida Alternativa: (Viabilidad SCP o AR)
-                        - Recomendación: (Juicio o Abreviado)
-                        """
-
-                    # Combinamos contexto y archivos
-                    prompt_final = [
-                        prompt_system + prompt_especifico, 
-                        f"Contexto adicional del defensor: {contexto_usuario}"
-                    ]
-                    prompt_final.extend(docs_para_gemini)
-
-                    # Generación de contenido
-                    response = model_analista.generate_content(prompt_final)
-                    
-                    # Validación de respuesta segura
-                    texto_resultado = safe_get_text(response)
-                    
-                    status_box.success("✅ Análisis Completado")
-                    st.markdown("---")
-
-                    # Lógica de visualización dividida para destacar el Resumen Estratégico
-                    if "RESUMEN ESTRATÉGICO" in texto_resultado:
-                        partes = texto_resultado.split("RESUMEN ESTRATÉGICO")
-                        resumen_texto = partes[-1]
-                        contenido_principal = partes[0]
-                        st.markdown(f"""
-                            <div class='resumen-dinamico'>
-                                <h4 style='margin-top:0;'>📊 RESUMEN ESTRATÉGICO</h4>
-                                {resumen_texto}
-                            </div>
-                        """, unsafe_allow_html=True)
-                        st.markdown(contenido_principal)
-                    else:
-                        st.markdown(texto_resultado)
-                    
-                    # Opción de descarga del informe generado
-                    st.download_button(
-                        "📥 Descargar Informe de Análisis", 
-                        texto_resultado, 
-                        f"Analisis_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                        use_container_width=True
-                    )
-
-                    # Registro en logs de sesión
-                    if 'logs' in st.session_state:
-                        st.session_state.logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Análisis multimodal realizado.")
-
-                except Exception as e:
-                    st.error(f"Error durante el procesamiento multimodal: {e}")
-
-    # -----------------------------------------------------------------------------
-    # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
-    # -----------------------------------------------------------------------------
-    with tabs[1]:
-        st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
-        st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
-
-        objetivo_analisis = st.radio(
-            "¿Qué buscas en estos documentos?",
-            ["📄 Control de Detención (Busca ilegalidades)", 
-             "⚖️ Estrategia Integral (Teoría del Caso, Salidas & Prognosis)"],
-            horizontal=True
-        )
-
-        archivos_evidencia = st.file_uploader(
-            "Cargar Evidencia (PDF, JPG, PNG, TXT)", 
-            type=["pdf", "jpg", "png", "txt", "jpeg"], 
-            accept_multiple_files=True
-        )
-
-        contexto_usuario = st.text_area("Contexto adicional (Ej: 'El cliente dice que Carabineros mintió...')")
-
-        if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA"):
-            status_box = st.empty()
-            with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
-                try:
-                    model_analista = get_generative_model_dinamico()
-                    docs_para_gemini = []
-                    
-                    for archivo in archivos_evidencia:
-                        status_box.info(f"Subiendo a Gemini Vision: {archivo.name}...")
-                        suffix = f".{archivo.name.split('.')[-1]}"
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                            tmp.write(archivo.getvalue())
-                            tmp_path = tmp.name
-
-                        f_gemini = genai.upload_file(tmp_path)
-                        while f_gemini.state.name == "PROCESSING":
-                            time.sleep(1)
-                            f_gemini = genai.get_file(f_gemini.name)
-                            
-                        docs_para_gemini.append(f_gemini)
-                        os.remove(tmp_path)
-
-                    status_box.info("🧠 Generando estrategia jurídica integral...")
-
-                    prompt_system = """
-                    Eres un Estratega de Defensa Penal.
-                    IMPORTANTE: Tu respuesta es para un abogado. NO incluyas código python, ni json raw, ni expliques que eres una IA.
-                    Solo entrega el informe jurídico profesional.
-                    """
-
-                    if "Control de Detención" in objetivo_analisis:
-                        prompt_especifico = """
-                        TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
-                        Genera también un RECUADRO DE RESUMEN al final con:
-                        - Ilegalidad detectada: (Sí/No)
-                        - Probabilidad de éxito: (Alta/Media/Baja)
-                        - Argumento clave.
-                        """
-                    else:
-                        prompt_especifico = """
-                        TU MISIÓN: Construir una Estrategia de Defensa Integral.
-                        
-                        ESTRUCTURA OBLIGATORIA DEL INFORME:
-                        1. ANÁLISIS DE LA PRUEBA (Debilidades fiscalía).
-                        2. TEORÍA DEL CASO (Nuestra versión).
-                        
-                        AL FINAL, GENERA UN BLOQUE LLAMADO "RESUMEN ESTRATÉGICO" CON:
-                        - Pena Probable: (Ej: 541 días)
-                        - Pena Sustitutiva: (Ej: Remisión Condicional)
-                        - Atenuantes: (Lista)
-                        - Agravantes: (Lista)
-                        - Salida Alternativa: (Viabilidad SCP o AR)
-                        - Recomendación: (Juicio o Abreviado)
+                        AL FINAL, GENERA UN BLOQUE LLAMADO 'RESUMEN ESTRATÉGICO' CON:
+                        - Pena Probable, Pena Sustitutiva, Atenuantes, Agravantes, Salida Alternativa y Recomendación.
                         """
 
                     prompt_final = [prompt_system + prompt_especifico, f"Contexto adicional: {contexto_usuario}"]
                     prompt_final.extend(docs_para_gemini)
 
                     response = model_analista.generate_content(prompt_final)
+                    texto_resultado = safe_get_text(response)
+                    
+                    # --- ALIMENTAR MEMORIA MAESTRA ---
+                    if 'all_text' not in st.session_state: st.session_state.all_text = ""
+                    st.session_state.all_text += f"\n--- ANÁLISIS {datetime.now()} ---\n{texto_resultado}"
                     
                     status_box.success("✅ Análisis Completado")
-                    
-                    texto_resultado = response.text
-                    
-                    # Extracción simple del Resumen para mostrar en recuadro bonito
+                    st.markdown("---")
+
                     if "RESUMEN ESTRATÉGICO" in texto_resultado:
                         partes = texto_resultado.split("RESUMEN ESTRATÉGICO")
                         resumen_texto = partes[-1]
@@ -1535,7 +1399,7 @@ def main_app():
                     else:
                         st.markdown(texto_resultado)
                     
-                    st.download_button("📥 Descargar Informe", texto_resultado, "Analisis_Integral_Legal.txt")
+                    st.download_button("📥 Descargar Informe", texto_resultado, f"Analisis_{archivo.name}.txt")
 
                 except Exception as e:
                     st.error(f"Error en el análisis multimodal: {e}")
