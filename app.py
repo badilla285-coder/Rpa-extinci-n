@@ -1430,61 +1430,112 @@ def main_app():
                 except Exception as e:
                     st.error(f"Error en el análisis multimodal: {e}")
 
-    # === TAB 3: TRANSCRIPTOR ===
+ # =============================================================================
+    # === TAB 3: TRANSCRIPTOR FORENSE & ESTRATEGA DE AUDIENCIA (FULL LITERAL) ===
+    # =============================================================================
     with tabs[2]:
-        st.header("🎙️ Transcriptor Forense & Generador de Recursos")
-        st.info("Sube el audio de la audiencia (MP3, WAV, M4A) para obtener la transcripción literal y un borrador de recurso inteligente.")
+        st.header("🎙️ Transcriptor Forense & Análisis de Resoluciones")
+        st.info("Configuración de Omisión Cero: Se transcribirá la totalidad del audio con énfasis estructural en hitos procesales.")
 
-        uploaded_audio = st.file_uploader("Cargar Audio de Audiencia", type=["mp3", "wav", "m4a", "ogg"])
+        col_audio, col_opts = st.columns([1, 1])
+
+        with col_audio:
+            uploaded_audio = st.file_uploader("Cargar Audio (MP3, WAV, M4A, OGG)", type=["mp3", "wav", "m4a", "ogg"])
+            es_audiencia = st.toggle("¿Es una audiencia judicial?", value=True, help="Si es audiencia, el modelo buscará roles de Juez, Fiscal y Defensor.")
+
+        with col_opts:
+            st.markdown("#### ⚙️ Configuración de Escucha")
+            c1, c2 = st.columns(2)
+            timestamps = c1.checkbox("Marcas de tiempo", value=True)
+            speakers = c2.checkbox("Identificar hablantes", value=True)
+            
+            secciones_interes = st.multiselect(
+                "Hitos para identificación y énfasis (Se transcribirán ÍNTEGROS):",
+                ["Resolución del Juez (Argumento, Análisis y Fallo)", 
+                 "Formalización de la Investigación", 
+                 "Argumentos de la Defensa", 
+                 "Incidentes, Excepciones y Nulidades", 
+                 "Debate de Medidas Cautelares",
+                 "Declaración de Imputado/Testigos"],
+                default=["Resolución del Juez (Argumento, Análisis y Fallo)", "Argumentos de la Defensa"]
+            )
 
         if uploaded_audio is not None:
-            if st.button("🚀 PROCESAR AUDIO (AUTO-DETECTAR MODELO)"):
+            if st.button("🚀 INICIAR TRANSCRIPCIÓN LITERAL COMPLETA", use_container_width=True):
                 status_container = st.empty()
-                with st.spinner("🔄 Auto-detectando modelo y procesando..."):
+                with st.spinner("🔄 Procesando audio... El motor está configurado para no omitir ningún fragmento."):
                     try:
-                        model_transcriptor = get_generative_model_dinamico() # Usamos el getter dinámico
-                        status_container.info(f"🤖 Procesando audio...")
-
+                        # 1. Preparación del modelo y carga de archivo
+                        model_transcriptor = get_generative_model_dinamico()
+                        
                         suffix = f".{uploaded_audio.name.split('.')[-1]}"
                         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
                             tmp_file.write(uploaded_audio.getvalue())
                             tmp_path = tmp_file.name
 
-                        archivo_gemini = genai.upload_file(tmp_path, mime_type="audio/mp3")
+                        status_container.info("📤 Subiendo archivo al servidor forense...")
+                        archivo_gemini = genai.upload_file(tmp_path)
 
-                        status_container.info("⏳ Esperando procesamiento de Google...")
                         while archivo_gemini.state.name == "PROCESSING":
                             time.sleep(2)
                             archivo_gemini = genai.get_file(archivo_gemini.name)
 
                         if archivo_gemini.state.name == "FAILED":
-                            raise ValueError("Google falló al procesar el audio.")
+                            raise ValueError("Error en el servidor de Google al procesar el audio.")
 
-                        status_container.info("📝 Redactando recurso...")
+                        # 2. Construcción del Prompt de Omisión Cero
+                        foco_hitos = ""
+                        if secciones_interes:
+                            foco_hitos = f"Debes poner especial énfasis estructural y destacar con títulos claros las siguientes partes: {', '.join(secciones_interes)}."
+
+                        prompt_completo = f"""
+                        Actúa como un Estenógrafo Forense de alta precisión y Abogado Senior especializado en Recursos Procesales.
                         
-                        prompt_transcripcion = """
-                        Actúa como un Estenógrafo Judicial y Abogado Penalista.
-                        TAREA 1: Transcribe LITERALMENTE el audio (Juez, Fiscal, Defensa).
-                        TAREA 2: Redacta un BORRADOR DE RECURSO (Apelación o Amparo) detectando los vicios en el audio.
-                        Estructura: Resolución Impugnada, Argumentos Defensa, Agravio, Petitorio.
+                        OBJETIVO: Realizar una transcripción TOTAL y LITERAL de la grabación adjunta.
+                        
+                        REGLAS DE ORO (PROHIBIDO INCUMPLIR):
+                        1. NO RESUMIR: No puedes resumir ninguna parte del audio. Si alguien habla, su intervención debe aparecer completa.
+                        2. OMISIÓN CERO: Transcribe desde el primer segundo hasta el último. No omitas saludos, introducciones ni debates menores.
+                        3. RESOLUCIÓN JUDICIAL: Si el juez dicta una resolución, copia cada palabra. Es CRÍTICO para la defensa tener el argumento, el análisis jurídico y la decisión EXACTA.
+                        4. {foco_hitos}
+                        
+                        ESTRUCTURA DEL DOCUMENTO:
+                        - ENCABEZADO: Datos del archivo y fecha de procesamiento.
+                        - TRANSCRIPCIÓN LITERAL: Cuerpo completo del audio {'con marcas de tiempo [00:00]' if timestamps else ''} {'e identificación de hablantes' if speakers else ''}.
+                        - ANÁLISIS DE HITOS: Un desglose técnico de los momentos clave seleccionados.
+                        - BORRADOR DE RECURSO: Redacta una propuesta de Apelación o Amparo. En la sección de 'Resolución Impugnada', CITA TEXTUALMENTE la resolución del juez que transcribiste arriba.
                         """
 
-                        response = model_transcriptor.generate_content([prompt_transcripcion, archivo_gemini])
-                        texto_generado = response.text
+                        status_container.info("📝 Redactando transcripción íntegra y borrador de recurso...")
+                        
+                        # Llamada al modelo
+                        response = model_transcriptor.generate_content([prompt_completo, archivo_gemini])
+                        texto_generado = safe_get_text(response)
 
-                        status_container.success("✅ ¡Listo!")
-                        st.subheader(f"📄 Resultado")
+                        status_container.success("✅ ¡Transcripción y Análisis Completados!")
+                        
+                        st.markdown("---")
+                        st.subheader("📋 Documento Judicial Forense")
+                        
+                        # Visualización del resultado
                         st.markdown(texto_generado)
 
-                        st.download_button("📥 Descargar", texto_generado, "Recurso_Audiencia.txt")
+                        # Botón de descarga
+                        st.download_button(
+                            label="📥 Descargar Acta de Transcripción e Informe",
+                            data=texto_generado,
+                            file_name=f"Transcripcion_Literal_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
 
                     except Exception as e:
-                        st.error(f"Error: {e}")
+                        st.error(f"Error técnico en el transcriptor: {e}")
                     finally:
                         if 'tmp_path' in locals() and os.path.exists(tmp_path):
                             os.remove(tmp_path)
         else:
-            st.warning("Por favor, carga un archivo de audio para comenzar.")
+            st.warning("⚠️ Esperando archivo de audio para iniciar el análisis.")
 
     # === TAB 4: BIBLIOTECA INTELIGENTE (RAG MEJORADO + ANALISIS) ===
     with tabs[3]:
