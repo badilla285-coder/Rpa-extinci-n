@@ -37,14 +37,14 @@ except ImportError:
 def get_langchain_model():
     """Retorna una instancia de ChatGoogleGenerativeAI configurada."""
     try:
-        # Verificamos si la API KEY existe en secrets para evitar errores mudos
+        # Verificamos si la API KEY existe en secrets
         if "GOOGLE_API_KEY" not in st.secrets:
             st.error("Falta la configuración de GOOGLE_API_KEY en los Secrets de Streamlit.")
             return None
             
         api_key = st.secrets["GOOGLE_API_KEY"]
         
-        # CORRECCIÓN: Usamos STRINGS en lugar de Enums para satisfacer al validador de LangChain
+        # 1. SEGURIDAD: Usamos Strings para evitar el error de validación anterior
         safety_settings = {
             "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
             "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
@@ -52,12 +52,14 @@ def get_langchain_model():
             "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
         }
 
+        # 2. MODELO: Usamos la versión explícita '001' para evitar el error 404 NOT FOUND
+        # Si 'gemini-1.5-flash' falla, 'gemini-1.5-flash-001' suele ser la ruta estable.
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash", 
-            temperature=0.3, # Precisión legal mantenida
+            model="gemini-1.5-flash-001", 
+            temperature=0.3,
             google_api_key=api_key,
             convert_system_message_to_human=True,
-            safety_settings=safety_settings # Ahora pasa un diccionario de strings válido
+            safety_settings=safety_settings
         )
         return llm
     except Exception as e:
