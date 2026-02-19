@@ -51,6 +51,62 @@ def get_langchain_model():
     except Exception as e:
         st.error(f"Error iniciando LangChain: {e}")
         return None
+        # === CONFIGURACIÓN DE PROMPT TEMPLATE (ESTÁNDAR JURÍDICO) ===
+
+def get_legal_prompt_template():
+    """
+    Define la estructura de pensamiento del modelo.
+    Diseñado para análisis de documentos y asistencia legal.
+    """
+    template = """
+    Eres un asistente de Inteligencia Artificial especializado en el ámbito jurídico chileno, 
+    actuando como un apoyo experto para un profesional del derecho.
+
+    CONTEXTO DEL CASO:
+    {context}
+
+    INSTRUCCIÓN ESPECÍFICA:
+    {question}
+
+    DIRECTRICES DE RESPUESTA:
+    1. Utiliza terminología técnica precisa (ej. "procedimiento ordinario", "excepciones dilatorias", "acción de protección").
+    2. Si el contexto no contiene información suficiente, admítelo con honestidad.
+    3. Organiza la respuesta de forma jerárquica y clara.
+    4. Mantén un tono formal, objetivo y analítico.
+
+    RESPUESTA TÉCNICA:
+    """
+    
+    return PromptTemplate(
+        template=template,
+        input_variables=["context", "question"]
+    )
+
+# === INTEGRACIÓN EN LA CADENA DE TRABAJO (CHAIN) ===
+
+def process_legal_query(user_question, context_data):
+    """
+    Ejecuta la cadena de LangChain (Chain) para procesar la consulta.
+    """
+    llm = get_langchain_model()
+    if llm is None:
+        return "Error: No se pudo inicializar el modelo."
+
+    prompt = get_legal_prompt_template()
+    
+    # Construcción de la cadena usando el lenguaje de expresión de LangChain (LCEL)
+    chain = (
+        {"context": lambda x: context_data, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+    
+    try:
+        response = chain.invoke(user_question)
+        return response
+    except Exception as e:
+        return f"Error durante el procesamiento: {str(e)}"
 # ... (Continúa con tu código de configuración y CSS)
 
 # =============================================================================
