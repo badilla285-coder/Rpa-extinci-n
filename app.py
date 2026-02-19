@@ -182,26 +182,35 @@ def extraer_texto_docx(file):
         st.error(f"Error leyendo Word: {e}")
         return ""
 
+# =============================================================================
+# FUNCIONES DE EXTRACCIÓN Y SEGURIDAD (CORREGIDAS)
+# =============================================================================
+
 def extraer_texto_generico(uploaded_file):
     """Detecta el tipo de archivo y extrae el texto de forma automática."""
-    if uploaded_file is None: return ""
+    if uploaded_file is None: 
+        return ""
     try:
-        if uploaded_file.name.lower().endswith('.pdf'):
+        nombre_archivo = uploaded_file.name.lower()
+        if nombre_archivo.endswith('.pdf'):
             return extraer_texto_pdf(uploaded_file)
-        elif uploaded_file.name.lower().endswith(('.docx', '.doc')):
+        elif nombre_archivo.endswith(('.docx', '.doc')):
             return extraer_texto_docx(uploaded_file)
+        elif nombre_archivo.endswith('.txt'):
+            return str(uploaded_file.read(), "utf-8")
         return ""
     except Exception as e:
         st.error(f"Error extrayendo texto de {uploaded_file.name}: {e}")
         return ""
-        def safe_get_text(response):
+
+def safe_get_text(response):
     """
     Extrae el texto de la respuesta de Gemini de forma segura.
     Maneja bloqueos por políticas de seguridad (finish_reason 3).
     """
     try:
         if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
-            # finish_reason 3 significa que fue bloqueado por seguridad
+            # finish_reason 3 significa que fue bloqueado por seguridad de Google
             if response.candidates[0].finish_reason == 3:
                 return "⚠️ El motor de IA ha detectado contenido sensible y ha bloqueado la respuesta por políticas de seguridad. Intenta reformular la consulta con lenguaje técnico."
             
@@ -209,7 +218,7 @@ def extraer_texto_generico(uploaded_file):
             return response.text
         return "⚠️ No se recibió una respuesta válida de la IA."
     except Exception as e:
-        # En caso de error de acceso (por ejemplo, si la respuesta está vacía)
+        # En caso de error de acceso (por ejemplo, si la respuesta está vacía o bloqueada totalmente)
         return f"⚠️ Error procesando la respuesta: {str(e)}"
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
