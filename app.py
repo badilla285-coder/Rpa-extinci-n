@@ -33,7 +33,7 @@ except ImportError:
 # CONFIGURACIÓN DE IA (LANGCHAIN & GEMINI) - CORRECCIÓN 404 & SEGURIDAD
 # =============================================================================
 
-# Configuración de LangChain con Gemini (SOLUCIÓN DEFINITIVA 404)
+# Configuración de LangChain con Gemini (SOLUCIÓN DEFINITIVA 404 & FALLBACK)
 def get_langchain_model():
     """Retorna una instancia de ChatGoogleGenerativeAI configurada dinámicamente."""
     try:
@@ -53,28 +53,29 @@ def get_langchain_model():
         }
 
         # 2. SELECCIÓN DINÁMICA DE MODELO
-        # Consultamos a Google qué modelos tiene la cuenta para evitar '404 Not Found'
-        nombre_modelo = "gemini-pro" # Fallback seguro (modelo legacy estable)
+        # Definimos el estándar actual como fallback principal para evitar 'gemini-pro' (404)
+        nombre_modelo = "gemini-1.5-flash" 
         
         try:
             genai.configure(api_key=api_key)
-            # Obtenemos lista real de modelos disponibles
-            modelos_disponibles = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            # Obtenemos lista limpia de modelos (sin el prefijo 'models/')
+            # Filtramos solo los que soportan 'generateContent'
+            modelos_raw = genai.list_models()
+            modelos_disponibles = [m.name.replace("models/", "") for m in modelos_raw if 'generateContent' in m.supported_generation_methods]
             
-            # Buscamos 'gemini-1.5-flash' (cualquier versión: 001, 002, latest, etc.)
-            flash = next((m for m in modelos_disponibles if 'gemini-1.5-flash' in m), None)
-            
-            # Buscamos 'gemini-1.5-pro' si no hay flash
-            pro = next((m for m in modelos_disponibles if 'gemini-1.5-pro' in m), None)
-            
-            if flash: 
-                # LangChain a veces prefiere el nombre sin el prefijo 'models/'
-                nombre_modelo = flash.replace("models/", "") 
-            elif pro: 
-                nombre_modelo = pro.replace("models/", "")
+            # Lógica de prioridad explícita
+            if "gemini-1.5-flash" in modelos_disponibles:
+                nombre_modelo = "gemini-1.5-flash"
+            elif "gemini-1.5-flash-001" in modelos_disponibles:
+                nombre_modelo = "gemini-1.5-flash-001"
+            elif "gemini-1.5-pro" in modelos_disponibles:
+                nombre_modelo = "gemini-1.5-pro"
+            elif "gemini-1.0-pro" in modelos_disponibles:
+                nombre_modelo = "gemini-1.0-pro"
                 
-        except Exception:
-            # Si falla la conexión previa, intentamos con el último conocido
+        except Exception as e:
+            # Si falla la conexión a list_models, usamos el fallback "gemini-1.5-flash" silenciosamente
+            # st.warning(f"Usando modelo por defecto tras error de lista: {e}") 
             pass
 
         # 3. Inicialización
