@@ -1640,46 +1640,6 @@ def main_app():
                             st.error(f"Error analizando borrador: {e}")
             else:
                 st.warning("Carga un archivo para iniciar el análisis estratégico.")
-
-        # --- OPCIÓN 3: ESTRATEGIA GLOBAL (MASTER RPA - CONVERSA CON EL CASO) ---
-        elif modo_biblio == "🧠 Estrategia Global (Master RPA)":
-            st.markdown("### 🤖 Procesamiento Inteligente de la Causa (Master RPA)")
-            st.info("Este motor analiza la TOTALIDAD del texto extraído de la evidencia cargada en la sesión (Analista Multimodal o Admin).")
-            
-            # Recuperamos el texto acumulado
-            texto_maestro = st.session_state.get('all_text', "").strip()
-            
-            if not texto_maestro:
-                st.warning("⚠️ Memoria vacía. Primero carga y analiza documentos en la pestaña 'Analista Multimodal' o 'Transcriptor' para alimentar este cerebro.")
-            else:
-                st.success(f"✅ Memoria activa detectada: {len(texto_maestro)} caracteres listos para análisis estratégico integral.")
-                
-                if st.button("🚀 GENERAR ESTRATEGIA GLOBAL DEL CASO", use_container_width=True):
-                    with st.spinner("Cruzando información de todos los documentos y audios analizados en la sesión..."):
-                        try:
-                            prompt_master = """
-                            Actúa como Jefe de Defensores Penalistas. Tienes acceso a toda la evidencia del caso acumulada hoy.
-                            REALIZA UN ANÁLISIS MAESTRO INTEGRAL:
-                            1. CRONOLOGÍA DE HECHOS: Establece la línea de tiempo real basada en todos los antecedentes.
-                            2. CONTRADICCIONES CRÍTICAS: Identifica dónde se contradice la fiscalía, testigos o el parte policial comparando diferentes fuentes.
-                            3. TEORÍA DEL CASO: Sugiere la narrativa de defensa más sólida.
-                            4. PROGNOSIS Y SALIDAS: Evalúa riesgo de condena y conveniencia de salidas alternativas (SCP o AR).
-                            """
-                            # Llamada a la IA para análisis de toda la sesión
-                            informe_maestro = process_legal_query(prompt_master, texto_maestro)
-                            
-                            st.markdown("---")
-                            st.markdown("#### 🧠 Informe Maestro de Estrategia RPA")
-                            st.markdown(informe_maestro)
-                            
-                            if 'logs' in st.session_state:
-                                timestamp_rpa = datetime.now().strftime('%H:%M:%S')
-                                st.session_state.logs.append(f"[{timestamp_rpa}] Análisis Maestro RPA de la causa ejecutado.")
-                            
-                            st.success("✅ Estrategia global generada exitosamente.")
-                            
-                        except Exception as e:
-                            st.error(f"Error en el motor Maestro: {e}")
             
            # --- ANÁLISIS REAL DE ESTRATEGIA JURÍDICA ---
             st.info("💡 Análisis estratégico real mediante LangChain y Gemini 1.5 Pro.")
