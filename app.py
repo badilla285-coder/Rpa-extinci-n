@@ -1198,7 +1198,7 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-                             # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
+                          # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
         st.markdown("---")
         with st.expander("🛠️ PANEL DE CONTROL RPA & ANÁLISIS MAESTRO", expanded=True):
             st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
@@ -1237,7 +1237,6 @@ def main_app():
                             
                         except Exception as e:
                             st.error(f"Error crítico en el motor de IA: {e}")
-
     # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
