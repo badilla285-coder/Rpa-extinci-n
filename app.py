@@ -1437,38 +1437,38 @@ def main_app():
             st.info("Sube tu borrador. La IA detectará debilidades y sugerirá argumentos de derecho sólidos.")
             borrador = st.file_uploader("Sube tu borrador (PDF/Word/Txt)", type=["pdf","docx","txt"])
             
-            # Placeholder conexión externa (Simulación)
-            st.checkbox("Incluir búsqueda en fuentes externas (Simulación - Diario Oficial / PJUD)", value=True, disabled=True)
+           # --- ANÁLISIS REAL DE ESTRATEGIA JURÍDICA ---
+            st.info("💡 Análisis estratégico real mediante LangChain y Gemini 1.5 Pro.")
             
-            if borrador and st.button("Analizar y Buscar Apoyo"):
-                with st.spinner("Analizando estrategia jurídica..."):
+            if borrador and st.button("⚖️ Ejecutar Análisis Estratégico Real"):
+                with st.spinner("Analizando estrategia jurídica con IA..."):
                     try:
-                        model_analista = get_generative_model_dinamico()
+                        # Extraemos el texto del borrador subido
+                        texto_borrador = extraer_texto_generico(borrador)
                         
-                        suffix = f".{borrador.name.split('.')[-1]}"
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                            tmp.write(borrador.getvalue())
-                            tmp_path = tmp.name
-                        
-                        f_gemini = genai.upload_file(tmp_path)
-                        while f_gemini.state.name == "PROCESSING": time.sleep(1); f_gemini = genai.get_file(f_gemini.name)
-                        
-                        prompt_analisis_escrito = """
-                        Actúa como un Abogado Senior y Profesor de Derecho Penal. Analiza el borrador adjunto.
-                        NO RESUMAS EL DOCUMENTO. VE DIRECTO AL GRANO.
-                        
-                        TU TAREA ES ENTREGAR 3 COSAS:
-                        1. 🚩 DEBILIDADES DETECTADAS: ¿Qué argumento es débil o falta fundamentación?
-                        2. 🛡️ SUGERENCIAS DE DERECHO: Redacta párrafos jurídicos sólidos que el usuario pueda copiar y pegar para reforzar esas debilidades. Cita artículos y principios.
-                        3. ⚖️ JURISPRUDENCIA SUGERIDA: Menciona qué tipo de fallos debería buscar para apoyar su tesis (ej: "Busca fallos sobre nulidad por falta de emplazamiento").
-                        """
-                        
-                        response = model_analista.generate_content([prompt_analisis_escrito, f_gemini])
-                        st.markdown(response.text)
-                        
-                        os.remove(tmp_path)
+                        if texto_borrador:
+                            prompt_analisis_escrito = """
+                            Actúa como un Abogado Senior y Profesor de Derecho Penal. Analiza el borrador adjunto.
+                            NO RESUMAS EL DOCUMENTO. VE DIRECTO AL GRANO.
+                            
+                            TU TAREA ES ENTREGAR:
+                            1. 🚩 DEBILIDADES DETECTADAS: ¿Qué argumento es débil o falta fundamentación?
+                            2. 🛡️ SUGERENCIAS DE DERECHO: Redacta párrafos jurídicos sólidos para reforzar esas debilidades.
+                            3. ⚖️ JURISPRUDENCIA SUGERIDA: Indica líneas de fallos específicas a buscar.
+                            """
+                            
+                            # Llamada real a la IA
+                            respuesta_real = process_legal_query(prompt_analisis_escrito, texto_borrador)
+                            
+                            st.success("✅ Análisis Estratégico Completado")
+                            st.markdown("---")
+                            st.markdown(respuesta_real)
+                            st.session_state.logs.append(f"Análisis de borrador '{borrador.name}' completado.")
+                        else:
+                            st.error("No se pudo extraer texto del borrador.")
+                            
                     except Exception as e:
-                        st.error(f"Error analizando escrito: {e}")
+                        st.error(f"Error en el análisis real: {e}")
 
     # === TAB 5: ADMIN & CARGA (GESTIÓN USUARIOS + INGESTA DINÁMICA + OCR) ===
     with tabs[4]:
