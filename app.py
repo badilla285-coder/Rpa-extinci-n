@@ -14,6 +14,31 @@ import random
 import tempfile
 import os
 import numpy as np # Importante para los vectores
+# ... (Tus imports existentes hasta numpy)
+import numpy as np
+
+# === NUEVOS IMPORTS LANGCHAIN (LEGAL TECH NIVEL 1) ===
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import PromptTemplate
+from langchain.schema.output_parser import StrOutputParser
+from langchain.schema.runnable import RunnablePassthrough
+
+# Configuración de LangChain con Gemini
+def get_langchain_model():
+    """Retorna una instancia de ChatGoogleGenerativeAI configurada."""
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash", # O "gemini-1.5-pro" para razonamiento complejo
+            temperature=0.3, # Baja temperatura para precisión legal
+            google_api_key=api_key,
+            convert_system_message_to_human=True
+        )
+        return llm
+    except Exception as e:
+        st.error(f"Error iniciando LangChain: {e}")
+        return None
+# ... (Continúa con tu código de configuración y CSS)
 
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
