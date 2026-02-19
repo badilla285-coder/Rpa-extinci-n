@@ -1224,7 +1224,7 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-                     # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
+ # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
         st.markdown("---")
         with st.expander("🛠️ PANEL DE CONTROL RPA & ANÁLISIS MAESTRO", expanded=True):
             st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
@@ -1238,31 +1238,32 @@ def main_app():
                 else:
                     with st.spinner("⚖️ Analizando documentos con Inteligencia Artificial..."):
                         try:
-                        # 1. Definimos la consulta
-                        query_rpa = """
-                        Realiza un análisis jurídico profundo de los documentos proporcionados.
-                        TU TAREA:
-                        1. RESUMEN EJECUTIVO: Puntos clave de las causas.
-                        2. DETECCIÓN DE RIESGOS: Identifica plazos por vencer o debilidades procesales.
-                        3. RECOMENDACIÓN: Sugiere la mejor vía de extinción o recurso aplicable.
-                        """
+                            # 1. Definimos la consulta técnica
+                            query_rpa = """
+                            Realiza un análisis jurídico profundo de los documentos proporcionados.
+                            TU TAREA:
+                            1. RESUMEN EJECUTIVO: Puntos clave de las causas.
+                            2. DETECCIÓN DE RIESGOS: Identifica plazos por vencer o debilidades procesales.
+                            3. RECOMENDACIÓN: Sugiere la mejor vía de extinción o recurso aplicable.
+                            """
+                            
+                            # 2. Ejecutamos la llamada al modelo mediante la función LangChain definida
+                            resultado_ia = process_legal_query(query_rpa, st.session_state.all_text)
+                            
+                            # 3. Despliegue de resultados en la interfaz
+                            st.markdown("---")
+                            st.markdown("#### 📋 Informe de Análisis Legal")
+                            st.markdown(resultado_ia)
+                            
+                            # 4. Registro en el log del sistema
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            if 'logs' not in st.session_state: 
+                                st.session_state.logs = []
+                            st.session_state.logs.append(f"[{timestamp}] Análisis RPA completado.")
+                            st.success("✅ Procesamiento finalizado con éxito.")
                         
-                        # 2. Ejecutamos la llamada al modelo
-                        resultado_ia = process_legal_query(query_rpa, st.session_state.all_text)
-                        
-                        # 3. Despliegue de resultados
-                        st.markdown("---")
-                        st.markdown("#### 📋 Informe de Análisis Legal")
-                        st.markdown(resultado_ia)
-                        
-                        # 4. Registro en el log (Aquí estaba el error de indentación)
-                        timestamp = datetime.now().strftime("%H:%M:%S")
-                        if 'logs' not in st.session_state: st.session_state.logs = []
-                        st.session_state.logs.append(f"[{timestamp}] Análisis RPA completado.")
-                        st.success("✅ Procesamiento finalizado con éxito.")
-                    
-                    except Exception as e:
-                        st.error(f"Error crítico en el motor de IA: {e}")
+                        except Exception as e:
+                            st.error(f"Error crítico en el motor de IA: {e}")
 
     # =============================================================================
     # TAB 2: ANALISTA MULTIMODAL
