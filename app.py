@@ -1289,13 +1289,13 @@ def main_app():
     # === TAB 2: ANALISTA MULTIMODAL (VISION & STRATEGY) ===
     # =============================================================================
     with tabs[1]:
-        st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
+        st.header("🕵️ Analista Jurídico Multimodal")
         st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
 
         objetivo_analisis = st.radio(
             "¿Qué buscas en estos documentos?",
             ["📄 Control de Detención (Busca ilegalidades)", 
-             "⚖️ Estrategia Integral (Teoría del Caso, Salidas & Prognosis)"],
+             "⚖️ Estrategia Integral (Teoría del Caso)"],
             horizontal=True,
             key="radio_objetivo_principal"
         )
@@ -1501,7 +1501,7 @@ def main_app():
         # Selector de Herramienta en la Biblioteca
         modo_biblio = st.radio(
             "Selecciona Herramienta de Investigación:", 
-            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito", "🧠 Estrategia Global (Master RPA)"], 
+            ["🔍 Buscador Jurídico Avanzado", "📄 Analizar mi Escrito",
             horizontal=True,
             key="selector_biblioteca_maestra"
         )
