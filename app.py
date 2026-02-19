@@ -53,38 +53,37 @@ def get_langchain_model():
         }
 
         # 2. SELECCIÓN DINÁMICA DE MODELO (MODO SUPERVIVENCIA)
-        # Por defecto usamos un fallback muy conservador si la detección falla
-        nombre_modelo = "gemini-pro" 
+        # Inicializamos con el estándar actual más probable por si falla la detección
+        nombre_modelo = "gemini-1.5-flash" 
         
         try:
             genai.configure(api_key=api_key)
             # Obtenemos lista real de modelos disponibles para tu API Key
-            modelos_raw = genai.list_models()
+            # Filtramos solo los que soportan 'generateContent' para evitar errores de capacidad
+            modelos_raw = [m for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
             
-            # Filtramos y limpiamos nombres (quitamos el prefijo 'models/')
-            disponibles = []
-            for m in modelos_raw:
-                if 'generateContent' in m.supported_generation_methods:
-                    name_clean = m.name.replace("models/", "")
-                    disponibles.append(name_clean)
+            # Estrategia de búsqueda prioritaria:
+            # 1. Buscar cualquier variante de 'flash' (son más rápidos y baratos)
+            flash_models = [m.name for m in modelos_raw if 'flash' in m.name.lower()]
+            # 2. Buscar cualquier variante de 'pro' (más capacidad de razonamiento)
+            pro_models = [m.name for m in modelos_raw if 'pro' in m.name.lower()]
             
-            # Lógica de prioridad: Intentamos encontrar el mejor modelo disponible en TU lista
-            if "gemini-1.5-flash" in disponibles:
-                nombre_modelo = "gemini-1.5-flash"
-            elif "gemini-1.5-flash-latest" in disponibles:
-                nombre_modelo = "gemini-1.5-flash-latest"
-            elif "gemini-1.5-flash-001" in disponibles:
-                nombre_modelo = "gemini-1.5-flash-001"
-            elif "gemini-1.5-pro" in disponibles:
-                nombre_modelo = "gemini-1.5-pro"
-            elif "gemini-1.0-pro" in disponibles:
-                nombre_modelo = "gemini-1.0-pro"
+            # Selección del nombre EXACTO que devuelve la API
+            if flash_models:
+                # Preferimos el primero que encuentre (ej: models/gemini-1.5-flash-001)
+                nombre_modelo = flash_models[0].replace("models/", "")
+            elif pro_models:
+                nombre_modelo = pro_models[0].replace("models/", "")
+            elif modelos_raw:
+                # Si no hay flash ni pro, usamos el primero que exista (ej: models/gemini-1.0-pro)
+                nombre_modelo = modelos_raw[0].name.replace("models/", "")
             
-            # Debug (Opcional: puedes descomentar si quieres ver qué modelo eligió)
-            # st.write(f"Modelo seleccionado: {nombre_modelo}")
+            # Debug: Descomentar si necesitas ver qué modelo seleccionó
+            # print(f"Modelo seleccionado automáticamente: {nombre_modelo}")
 
         except Exception as e:
-            # Si falla la conexión a list_models, mantenemos el fallback "gemini-pro"
+            # Si falla la conexión a list_models, mantenemos "gemini-1.5-flash"
+            # IMPORTANTE: Ya no usamos "gemini-pro" de fallback porque da 404
             pass
 
         # 3. Inicialización del Chat
