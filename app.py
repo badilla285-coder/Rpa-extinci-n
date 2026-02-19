@@ -1198,6 +1198,46 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
+                             # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
+        st.markdown("---")
+        with st.expander("🛠️ PANEL DE CONTROL RPA & ANÁLISIS MAESTRO", expanded=True):
+            st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
+            st.info("Este panel utiliza IA para analizar la totalidad del texto extraído de los documentos cargados en el sistema.")
+            
+            if st.button("🚀 INICIAR ANÁLISIS ESTRATÉGICO RPA", use_container_width=True):
+                # Verificamos que exista texto acumulado en el estado de la sesión
+                # Nota: 'all_text' se alimenta desde la pestaña de Analista o Ingesta
+                if 'all_text' not in st.session_state or not st.session_state.all_text.strip():
+                    st.warning("⚠️ No hay texto extraído para procesar. Por favor, sube archivos en 'Analista' o 'Admin' primero.")
+                else:
+                    with st.spinner("⚖️ Analizando documentos con Inteligencia Artificial..."):
+                        try:
+                            # 1. Definimos una consulta técnica de alto nivel
+                            query_rpa = """
+                            Realiza un análisis jurídico profundo de los documentos proporcionados.
+                            TU TAREA:
+                            1. RESUMEN EJECUTIVO: Puntos clave de las causas.
+                            2. DETECCIÓN DE RIESGOS: Identifica plazos por vencer o debilidades procesales.
+                            3. RECOMENDACIÓN: Sugiere la mejor vía de extinción o recurso aplicable (Estilo Defensoría Chile).
+                            """
+                            
+                            # 2. Ejecutamos la llamada real al modelo configurado
+                            resultado_ia = process_legal_query(query_rpa, st.session_state.all_text)
+                            
+                            # 3. Despliegue de resultados
+                            st.markdown("---")
+                            st.markdown("#### 📋 Informe de Análisis Legal")
+                            st.markdown(resultado_ia)
+                            
+                            # 4. Registro en el log
+                            timestamp = datetime.now().strftime("%H:%M:%S")
+                            if 'logs' not in st.session_state: st.session_state.logs = []
+                            st.session_state.logs.append(f"[{timestamp}] Análisis RPA masivo completado.")
+                            st.success("✅ Procesamiento finalizado con éxito.")
+                            
+                        except Exception as e:
+                            st.error(f"Error crítico en el motor de IA: {e}")
+
     # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
