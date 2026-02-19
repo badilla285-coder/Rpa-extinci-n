@@ -1239,8 +1239,10 @@ def main_app():
                             st.session_state.logs.append(f"[{timestamp}] Análisis RPA masivo completado.")
                             st.success("✅ Procesamiento finalizado con éxito.")
                             
-                        except Exception as e:
+                                          except Exception as e:
                             st.error(f"Error crítico en el motor de IA: {e}")
+
+                            
     # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
@@ -1324,6 +1326,8 @@ def main_app():
                     status_box.success("✅ Análisis Completado")
                     
                     texto_resultado = response.text
+
+        
     # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
