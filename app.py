@@ -1224,45 +1224,49 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
- # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
+# --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
         st.markdown("---")
         with st.expander("🛠️ PANEL DE CONTROL RPA & ANÁLISIS MAESTRO", expanded=True):
             st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
             st.info("Este panel utiliza IA para analizar la totalidad del texto extraído de los documentos cargados en el sistema.")
             
             if st.button("🚀 INICIAR ANÁLISIS ESTRATÉGICO RPA", use_container_width=True):
-                # Verificamos que exista texto acumulado en el estado de la sesión
+                # 1. Verificación de existencia de texto acumulado en el estado de la sesión
                 # Nota: 'all_text' se alimenta desde la pestaña de Analista o Ingesta
                 if 'all_text' not in st.session_state or not st.session_state.all_text.strip():
                     st.warning("⚠️ No hay texto extraído para procesar. Por favor, sube archivos en 'Analista' o 'Admin' primero.")
                 else:
                     with st.spinner("⚖️ Analizando documentos con Inteligencia Artificial..."):
                         try:
-                            # 1. Definimos la consulta técnica
+                            # 2. Definimos la consulta técnica estructurada para el modelo
                             query_rpa = """
                             Realiza un análisis jurídico profundo de los documentos proporcionados.
                             TU TAREA:
-                            1. RESUMEN EJECUTIVO: Puntos clave de las causas.
-                            2. DETECCIÓN DE RIESGOS: Identifica plazos por vencer o debilidades procesales.
-                            3. RECOMENDACIÓN: Sugiere la mejor vía de extinción o recurso aplicable.
+                            1. RESUMEN EJECUTIVO: Puntos clave de las causas detectadas.
+                            2. DETECCIÓN DE RIESGOS: Identifica plazos por vencer, contradicciones o debilidades procesales.
+                            3. RECOMENDACIÓN: Sugiere la mejor vía de extinción o recurso aplicable según la normativa chilena.
                             """
                             
-                            # 2. Ejecutamos la llamada al modelo mediante la función LangChain definida
+                            # 3. Ejecutamos la llamada al modelo mediante la función LangChain procesadora
                             resultado_ia = process_legal_query(query_rpa, st.session_state.all_text)
                             
-                            # 3. Despliegue de resultados en la interfaz
+                            # 4. Despliegue de resultados en la interfaz con formato Markdown
                             st.markdown("---")
                             st.markdown("#### 📋 Informe de Análisis Legal")
                             st.markdown(resultado_ia)
                             
-                            # 4. Registro en el log del sistema
+                            # 5. Registro seguro en el log del sistema
                             timestamp = datetime.now().strftime("%H:%M:%S")
-                            if 'logs' not in st.session_state: 
+                            
+                            # Aseguramos que 'logs' exista en session_state para evitar AttributeError
+                            if 'logs' not in st.session_state:
                                 st.session_state.logs = []
-                            st.session_state.logs.append(f"[{timestamp}] Análisis RPA completado.")
+                                
+                            st.session_state.logs.append(f"[{timestamp}] Análisis RPA completado con éxito.")
                             st.success("✅ Procesamiento finalizado con éxito.")
                         
                         except Exception as e:
+                            # Manejo de errores específicos del motor de IA
                             st.error(f"Error crítico en el motor de IA: {e}")
 
     # =============================================================================
