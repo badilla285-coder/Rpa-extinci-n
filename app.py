@@ -17,22 +17,35 @@ import numpy as np # Importante para los vectores
 # ... (Tus imports existentes hasta numpy)
 import numpy as np
 
-# === NUEVOS IMPORTS LANGCHAIN (LEGAL TECH NIVEL 1) ===
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-from langchain.schema.output_parser import StrOutputParser
-from langchain.schema.runnable import RunnablePassthrough
+# === NUEVOS IMPORTS LANGCHAIN (ESTRUCTURA ROBUSTA) ===
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain_core.prompts import PromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+    from langchain_core.runnables import RunnablePassthrough
+except ImportError:
+    # Fallback para versiones antiguas o instalaciones híbridas
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain.prompts import PromptTemplate
+    from langchain.schema.output_parser import StrOutputParser
+    from langchain.schema.runnable import RunnablePassthrough
 
 # Configuración de LangChain con Gemini
 def get_langchain_model():
     """Retorna una instancia de ChatGoogleGenerativeAI configurada."""
     try:
+        # Verificamos si la API KEY existe en secrets para evitar errores mudos
+        if "GOOGLE_API_KEY" not in st.secrets:
+            st.error("Falta la configuración de GOOGLE_API_KEY en los Secrets de Streamlit.")
+            return None
+            
         api_key = st.secrets["GOOGLE_API_KEY"]
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash", # O "gemini-1.5-pro" para razonamiento complejo
-            temperature=0.3, # Baja temperatura para precisión legal
+            model="gemini-1.5-flash", 
+            temperature=0.3, # Precisión legal mantenida
             google_api_key=api_key,
-            convert_system_message_to_human=True
+            # Esta opción ayuda a la compatibilidad con modelos antiguos si fuera necesario
+            convert_system_message_to_human=True 
         )
         return llm
     except Exception as e:
