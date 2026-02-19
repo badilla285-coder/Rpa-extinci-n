@@ -194,6 +194,23 @@ def extraer_texto_generico(uploaded_file):
     except Exception as e:
         st.error(f"Error extrayendo texto de {uploaded_file.name}: {e}")
         return ""
+        def safe_get_text(response):
+    """
+    Extrae el texto de la respuesta de Gemini de forma segura.
+    Maneja bloqueos por políticas de seguridad (finish_reason 3).
+    """
+    try:
+        if response and hasattr(response, 'candidates') and len(response.candidates) > 0:
+            # finish_reason 3 significa que fue bloqueado por seguridad
+            if response.candidates[0].finish_reason == 3:
+                return "⚠️ El motor de IA ha detectado contenido sensible y ha bloqueado la respuesta por políticas de seguridad. Intenta reformular la consulta con lenguaje técnico."
+            
+            # Intentamos retornar el texto normal
+            return response.text
+        return "⚠️ No se recibió una respuesta válida de la IA."
+    except Exception as e:
+        # En caso de error de acceso (por ejemplo, si la respuesta está vacía)
+        return f"⚠️ Error procesando la respuesta: {str(e)}"
 # =============================================================================
 # 1. CONFIGURACIÓN Y ESTILOS (INTERFAZ ELEGANTE & LEGIBLE)
 # =============================================================================
