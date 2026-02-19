@@ -9,6 +9,7 @@ from datetime import datetime
 import PyPDF2
 from supabase import create_client
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import time
 import random
 import tempfile
@@ -886,15 +887,18 @@ def login_screen():
 def init_session_data():
     defaults = {
         "imputado": "", 
-        "tribunal_sel": TRIBUNALES[9],
+        "tribunal_sel": TRIBUNALES[9] if TRIBUNALES else "",
         "ejecucion": [{"rit": "", "ruc": ""}],
-        "rpa": [{"rit": "", "ruc": "", "tribunal": TRIBUNALES[9], "sancion": ""}],
+        "rpa": [{"rit": "", "ruc": "", "tribunal": "", "sancion": ""}],
         "adulto": [],
         "prescripcion_list": [],
-        "lista_individualizacion": []
+        "lista_individualizacion": [],
+        "all_text": "",
+        "logs": []  # <--- ESTA LÍNEA ES VITAL PARA EL ERROR DE ATTRIBUTEERROR
     }
     for k, v in defaults.items():
-        if k not in st.session_state: st.session_state[k] = v
+        if k not in st.session_state:
+            st.session_state[k] = v
 
 def calcular_pena_exacta(delito_info, atenuantes, agravantes, es_rpa):
     idx_min = delito_info["idx_min"]
@@ -1198,7 +1202,7 @@ def main_app():
                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                              use_container_width=True)
 
-                          # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
+                     # --- ÁREA DE PROCESAMIENTO REAL (MASTER RPA) ---
         st.markdown("---")
         with st.expander("🛠️ PANEL DE CONTROL RPA & ANÁLISIS MAESTRO", expanded=True):
             st.markdown("### 🤖 Procesamiento Inteligente de la Causa")
@@ -1237,6 +1241,89 @@ def main_app():
                             
                         except Exception as e:
                             st.error(f"Error crítico en el motor de IA: {e}")
+    # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
+    with tabs[1]:
+        st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
+        st.info("Sube Carpetas Investigativas, Partes Policiales Escaneados, Fotos de Evidencia o Textos.")
+
+        objetivo_analisis = st.radio(
+            "¿Qué buscas en estos documentos?",
+            ["📄 Control de Detención (Busca ilegalidades)", 
+             "⚖️ Estrategia Integral (Teoría del Caso, Salidas & Prognosis)"],
+            horizontal=True
+        )
+
+        archivos_evidencia = st.file_uploader(
+            "Cargar Evidencia (PDF, JPG, PNG, TXT)", 
+            type=["pdf", "jpg", "png", "txt", "jpeg"], 
+            accept_multiple_files=True
+        )
+
+        contexto_usuario = st.text_area("Contexto adicional (Ej: 'El cliente dice que Carabineros mintió...')")
+
+        if archivos_evidencia and st.button("⚡ ANALIZAR EVIDENCIA CON IA"):
+            status_box = st.empty()
+            with st.spinner("Procesando evidencia multimodal (Vision IA)..."):
+                try:
+                    model_analista = get_generative_model_dinamico()
+                    docs_para_gemini = []
+                    
+                    for archivo in archivos_evidencia:
+                        status_box.info(f"Subiendo a Gemini Vision: {archivo.name}...")
+                        suffix = f".{archivo.name.split('.')[-1]}"
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                            tmp.write(archivo.getvalue())
+                            tmp_path = tmp.name
+
+                        f_gemini = genai.upload_file(tmp_path)
+                        while f_gemini.state.name == "PROCESSING":
+                            time.sleep(1)
+                            f_gemini = genai.get_file(f_gemini.name)
+                            
+                        docs_para_gemini.append(f_gemini)
+                        os.remove(tmp_path)
+
+                    status_box.info("🧠 Generando estrategia jurídica integral...")
+
+                    prompt_system = """
+                    Eres un Estratega de Defensa Penal.
+                    IMPORTANTE: Tu respuesta es para un abogado. NO incluyas código python, ni json raw, ni expliques que eres una IA.
+                    Solo entrega el informe jurídico profesional.
+                    """
+
+                    if "Control de Detención" in objetivo_analisis:
+                        prompt_especifico = """
+                        TU MISIÓN: Detectar vicios de legalidad para un Control de Detención.
+                        Genera también un RECUADRO DE RESUMEN al final con:
+                        - Ilegalidad detectada: (Sí/No)
+                        - Probabilidad de éxito: (Alta/Media/Baja)
+                        - Argumento clave.
+                        """
+                    else:
+                        prompt_especifico = """
+                        TU MISIÓN: Construir una Estrategia de Defensa Integral.
+                        
+                        ESTRUCTURA OBLIGATORIA DEL INFORME:
+                        1. ANÁLISIS DE LA PRUEBA (Debilidades fiscalía).
+                        2. TEORÍA DEL CASO (Nuestra versión).
+                        
+                        AL FINAL, GENERA UN BLOQUE LLAMADO "RESUMEN ESTRATÉGICO" CON:
+                        - Pena Probable: (Ej: 541 días)
+                        - Pena Sustitutiva: (Ej: Remisión Condicional)
+                        - Atenuantes: (Lista)
+                        - Agravantes: (Lista)
+                        - Salida Alternativa: (Viabilidad SCP o AR)
+                        - Recomendación: (Juicio o Abreviado)
+                        """
+
+                    prompt_final = [prompt_system + prompt_especifico, f"Contexto adicional: {contexto_usuario}"]
+                    prompt_final.extend(docs_para_gemini)
+
+                    response = model_analista.generate_content(prompt_final)
+                    
+                    status_box.success("✅ Análisis Completado")
+                    
+                    texto_resultado = response.text
     # === TAB 2: ANALISTA MULTIMODAL (MERGED FUNCTIONS + SUMMARY BOX) ===
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal (Vision & Strategy)")
