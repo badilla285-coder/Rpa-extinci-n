@@ -25,179 +25,172 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS Profesional: Diseño "Nórdico Legal" (Navy, Slate, Beige)
+# CSS Profesional: Diseño "LegalTech Premium"
 st.markdown("""
     <style>
-    /* Animación de entrada */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;600;800&display=swap');
+    
+    /* === TIPOGRAFÍA Y FONDO === */
+    .stApp {
+        background-color: #F8F9FA; /* Blanco humo muy suave */
+        font-family: 'Manrope', sans-serif;
     }
     
-    /* Tipografía y Fondo General */
-    .main {
-        background-color: #f4f7f6; /* Fondo gris muy suave */
-        font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-        color: #333333;
+    /* === SIDEBAR (BARRA LATERAL) === */
+    section[data-testid="stSidebar"] {
+        background-color: #161B2F; /* Navy Profundo */
+        box-shadow: 2px 0 10px rgba(0,0,0,0.1);
     }
-    
-    /* Encabezados - Navy Profundo */
+    section[data-testid="stSidebar"] h1, 
+    section[data-testid="stSidebar"] h2, 
+    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] label, 
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] div {
+        color: #ECEFF1 !important; /* Blanco hueso para texto sidebar */
+    }
+    /* Separador en sidebar */
+    section[data-testid="stSidebar"] hr {
+        border-color: #5B687C !important;
+    }
+
+    /* === ENCABEZADOS PRINCIPALES === */
     h1 { 
         color: #161B2F !important; 
         font-weight: 800; 
-        border-bottom: 2px solid #D4CDCB; /* Beige Suave */
+        letter-spacing: -0.02em;
+        border-bottom: 3px solid #D4CDCB;
         padding-bottom: 15px; 
-        letter-spacing: -0.5px;
-        text-transform: uppercase;
-        font-size: 1.8rem;
+        margin-bottom: 25px;
+        font-size: 2.2rem;
     }
-    h2, h3 { color: #161B2F !important; font-weight: 600; }
+    h2 { color: #2C3550 !important; font-weight: 700; margin-top: 20px; }
+    h3 { color: #5B687C !important; font-weight: 600; }
     
-    /* Botones Premium - Navy Profundo */
+    /* === BOTONES (Elegantes y con feedback) === */
     .stButton>button {
-        background-color: #161B2F !important;
+        background: linear-gradient(135deg, #161B2F 0%, #2C3550 100%) !important;
         color: white !important;
         border-radius: 8px;
-        font-weight: 600;
         border: none;
         padding: 0.6rem 1.2rem;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        width: 100%;
-        text-transform: uppercase;
+        font-weight: 600;
         letter-spacing: 0.5px;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 0 4px 6px rgba(22, 27, 47, 0.1);
+        width: 100%;
     }
     .stButton>button:hover {
-        background-color: #2C3550 !important; /* Un tono más claro para hover */
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        box-shadow: 0 7px 14px rgba(22, 27, 47, 0.2);
+        background: linear-gradient(135deg, #2C3550 0%, #161B2F 100%) !important;
     }
-    
-    /* Cajas de Información */
+    /* Botones secundarios (tipo "Limpiar") */
+    button[kind="secondary"] {
+        background: transparent !important;
+        border: 2px solid #5B687C !important;
+        color: #5B687C !important;
+    }
+    button[kind="secondary"]:hover {
+        background: #ECEFF1 !important;
+    }
+
+    /* === INPUTS Y TEXTAREAS === */
+    div[data-baseweb="input"] > div, 
+    div[data-baseweb="textarea"] > div,
+    div[data-baseweb="select"] > div {
+        background-color: #FFFFFF;
+        border-radius: 8px;
+        border: 1px solid #D4CDCB;
+        color: #161B2F;
+    }
+    div[data-baseweb="input"]:focus-within > div {
+        border-color: #161B2F !important;
+        box-shadow: 0 0 0 2px rgba(22, 27, 47, 0.1);
+    }
+
+    /* === TABS (PESTAÑAS) === */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 1px solid #D4CDCB;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        border-radius: 8px 8px 0 0;
+        background-color: transparent;
+        border: none;
+        color: #5B687C;
+        font-weight: 600;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        color: #161B2F;
+        background-color: #ECEFF1;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: white !important;
+        color: #161B2F !important;
+        border-bottom: 3px solid #161B2F !important;
+    }
+
+    /* === CAJAS Y TARJETAS === */
     .status-card {
         padding: 20px;
-        border-radius: 10px;
+        border-radius: 12px;
         background: #ffffff;
-        border-left: 5px solid #161B2F;
-        box-shadow: 0 4px 15px rgba(22, 27, 47, 0.05);
+        border-left: 6px solid #161B2F;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         color: #212121;
         margin-bottom: 20px;
     }
     
-    /* LOGIN HERO CSS */
-    .login-container {
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        border: 1px solid #D4CDCB; /* Beige Suave */
-        box-shadow: 0 4px 20px rgba(22, 27, 47, 0.08); /* Sombra Navy sutil */
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .hero-title {
-        color: #161B2F;
-        font-weight: 800;
-        font-size: 2.5rem;
-        margin-bottom: 0.5rem;
-        text-align: center;
-    }
-    .hero-subtitle {
-        font-size: 1.2rem;
-        color: #5B687C; /* Slate Blue */
-        margin-bottom: 30px;
-        font-style: italic;
-        text-align: center;
-        line-height: 1.6;
-    }
-    .feature-card {
-        background: white;
-        border: 1px solid #D4CDCB; /* Beige Suave */
-        border-radius: 10px;
-        padding: 1.5rem;
-        text-align: center;
-        transition: transform 0.3s;
-        height: 100%;
-        box-shadow: 0 4px 10px rgba(22, 27, 47, 0.03);
-    }
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(22, 27, 47, 0.08);
-    }
-    .feature-icon {
-        font-size: 2rem;
-        margin-bottom: 1rem;
-        display: block;
-        color: #5B687C;
-    }
-    .feature-title {
-        font-weight: 700;
-        color: #161B2F;
-        margin-bottom: 0.5rem;
-        display: block;
-    }
-    
-    /* Minuta en Pantalla - Estilo Expediente */
+    /* Minuta / Documento */
     .minuta-box {
-        background-color: #fffde7;
-        padding: 30px;
-        border-radius: 8px;
-        border: 1px solid #fdd835;
-        color: #212121 !important;
-        margin-top: 20px;
+        background-color: #fff;
+        padding: 40px;
+        border-radius: 4px;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         font-family: 'Courier New', Courier, monospace; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        border-left: 6px solid #fbc02d;
+        color: #333;
+        position: relative;
+    }
+    .minuta-box::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; bottom: 0;
+        width: 6px;
+        background: #FBC02D;
     }
     
-    /* Estilo para el resumen dinámico y respuestas jurídicas */
+    /* Resumen IA y Badges */
     .resumen-dinamico {
-        background-color: #F8F9FA;
-        border-left: 5px solid #161B2F;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        border: 1px solid #D4CDCB;
-    }
-    
-    /* Badges para Biblioteca */
-    .badge-tipo {
-        background-color: #ECEFF1;
-        color: #161B2F;
-        padding: 4px 8px;
+        background: linear-gradient(to right, #ffffff, #fcfcfc);
+        border: 1px solid #e0e0e0;
+        border-left: 5px solid #2C3550;
+        padding: 25px;
         border-radius: 12px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        border: 1px solid #D4CDCB;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .badge-tipo {
+        background-color: #161B2F;
+        color: #fff;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
     }
     .badge-rol {
-        background-color: #E8EAF6;
-        color: #5B687C;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        margin-left: 5px;
-        border: 1px solid #C5CAE9;
-    }
-    
-    /* Ajustes específicos Landing */
-    .feature-box {
-        text-align: center;
-        padding: 1.5rem;
-        background: white;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border: 1px solid #D4CDCB;
-        transition: transform 0.3s;
-    }
-    .feature-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(22, 27, 47, 0.08);
-    }
-    .feature-text {
-        color: #161B2F;
+        background-color: #ECEFF1;
+        color: #455A64;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
         font-weight: 700;
+        border: 1px solid #CFD8DC;
+        margin-left: 5px;
     }
     </style>
 """, unsafe_allow_html=True)
