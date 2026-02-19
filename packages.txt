@@ -1,6 +1,8 @@
 chromium
 chromium-driver
 libnss3
-libgconf-2-4
 libfontconfig1
 libxrender1
+ffmpeg
+libasound2-dev
+portaudio19-dev
