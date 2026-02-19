@@ -1286,7 +1286,7 @@ def main_app():
                              use_container_width=True)
 
 # =============================================================================
-    # === TAB 2: ANALISTA MULTIMODAL (VISION & STRATEGY) ===
+    # === TAB 2: ANALISTA MULTIMODAL ===
     # =============================================================================
     with tabs[1]:
         st.header("🕵️ Analista Jurídico Multimodal")
