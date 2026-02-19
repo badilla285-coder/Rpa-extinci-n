@@ -33,6 +33,7 @@ except ImportError:
 # CONFIGURACIÓN DE IA (LANGCHAIN & GEMINI) - CORRECCIÓN 404 & SEGURIDAD
 # =============================================================================
 
+# Configuración de LangChain con Gemini
 def get_langchain_model():
     """Retorna una instancia de ChatGoogleGenerativeAI configurada."""
     try:
@@ -43,22 +44,20 @@ def get_langchain_model():
             
         api_key = st.secrets["GOOGLE_API_KEY"]
         
-        # Configuración de seguridad para evitar censura en temas penales (Fix finish_reason 1)
-        # Esto permite procesar términos como "homicidio", "violencia", etc., sin bloqueos.
+        # CORRECCIÓN: Usamos STRINGS en lugar de Enums para satisfacer al validador de LangChain
         safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            "HARM_CATEGORY_HARASSMENT": "BLOCK_NONE",
+            "HARM_CATEGORY_HATE_SPEECH": "BLOCK_NONE",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "BLOCK_NONE",
+            "HARM_CATEGORY_DANGEROUS_CONTENT": "BLOCK_NONE",
         }
 
         llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash", 
             temperature=0.3, # Precisión legal mantenida
             google_api_key=api_key,
-            # Esta opción ayuda a la compatibilidad con modelos antiguos si fuera necesario
             convert_system_message_to_human=True,
-            safety_settings=safety_settings
+            safety_settings=safety_settings # Ahora pasa un diccionario de strings válido
         )
         return llm
     except Exception as e:
