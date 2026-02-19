@@ -8,7 +8,7 @@ google-generativeai>=0.7.0
 langchain>=0.1.0
 langchain-community>=0.0.10
 langchain-google-genai>=1.0.0
-langchain-core
+langchain-core>=0.1.0
 
 # PROCESAMIENTO DE DOCUMENTOS Y ARCHIVOS
 python-docx
