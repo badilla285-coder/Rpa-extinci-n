@@ -1230,7 +1230,7 @@ def main_app():
                             
                             # 3. Despliegue de resultados
                             st.markdown("---")
-                                                      st.markdown("#### 📋 Informe de Análisis Legal")
+                            st.markdown("#### 📋 Informe de Análisis Legal")
                             st.markdown(resultado_ia)
                             
                             # 4. Registro en el log
